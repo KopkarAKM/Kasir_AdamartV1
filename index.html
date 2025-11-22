@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adamart - Kasir Hybrid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, query, where, increment } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // --- KONFIGURASI FIREBASE (ADAMART POS) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBApyoL7sczxl1kDq_WgPtnYF4lyujuWgc",
+            authDomain: "adamart-pos.firebaseapp.com",
+            projectId: "adamart-pos",
+            storageBucket: "adamart-pos.firebasestorage.app",
+            messagingSenderId: "754641758734",
+            appId: "1:754641758734:web:8eaa07cf10ead6ea02aa5f"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // Expose db to global scope for functions
+        window.db = db;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.addDoc = addDoc;
+        window.updateDoc = updateDoc;
+        window.doc = doc;
+        window.query = query;
+        window.where = where;
+        window.increment = increment;
+    </script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'adamart': { 50: '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 300: '#7dd3fc', 400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Styles remain same */
+        body { box-sizing: border-box; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .loading { animation: pulse 2s infinite; }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .bounce-in { animation: bounceIn 0.6s ease-out; }
+        @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 70% { transform: scale(0.9); } 100% { transform: scale(1); opacity: 1; } }
+        .slide-up { animation: slideUp 0.4s ease-out; }
+        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .product-card { transition: all 0.2s ease; }
+        .product-card:hover { transform: translateY(-2px); }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Area Selection -->
+    <div id="areaSelection" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-8 card-shadow max-w-md w-full fade-in">
+            <div class="text-center mb-8">
+                <div class="text-6xl mb-4">⚡</div>
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">Adamart Hybrid</h1>
+                <p class="text-gray-600">Sistem Kasir Real-time</p>
+            </div>
+            <div class="space-y-4">
+                <button onclick="selectArea('adamart 73')" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-xl hover:scale-105 transition-all flex justify-between items-center">
+                    <div class="flex items-center gap-3"><span class="text-2xl">🏢</span><div class="text-left font-semibold">Adamart 73<div class="text-xs font-normal opacity-90">Area Utama</div></div></div><span>→</span>
+                </button>
+                <button onclick="selectArea('adamart induksi')" class="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl hover:scale-105 transition-all flex justify-between items-center">
+                    <div class="flex items-center gap-3"><span class="text-2xl">⚡</span><div class="text-left font-semibold">Adamart Induksi<div class="text-xs font-normal opacity-90">Area Induksi</div></div></div><span>→</span>
+                </button>
+                <button onclick="selectArea('adamart kelanis')" class="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 rounded-xl hover:scale-105 transition-all flex justify-between items-center">
+                    <div class="flex items-center gap-3"><span class="text-2xl">🌟</span><div class="text-left font-semibold">Adamart Kelanis<div class="text-xs font-normal opacity-90">Area Kelanis</div></div></div><span>→</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingScreen" class="hidden min-h-screen flex items-center justify-center p-4">
+        <div class="text-center">
+            <div class="loading bg-adamart-500 w-16 h-16 rounded-full mx-auto mb-4"></div>
+            <h3 class="text-xl font-bold text-gray-800">Menghubungkan ke Database...</h3>
+            <p class="text-gray-500 text-sm mt-2">Syncing with Firebase</p>
+        </div>
+    </div>
+
+    <!-- Main Interface -->
+    <div id="cashierInterface" class="hidden">
+        <header class="gradient-bg text-white p-4 sticky top-0 z-30 shadow-lg">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <button onclick="changeArea()" class="bg-white/20 p-2 rounded-lg hover:bg-white/30">🔄</button>
+                    <div>
+                        <h1 class="text-lg font-bold">Adamart POS</h1>
+                        <p id="currentArea" class="text-xs opacity-90">Area: -</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="showReportPage()" class="bg-white/20 px-3 py-2 rounded-lg text-sm hover:bg-white/30">📋 Lapor</button>
+                    <div class="text-right text-xs">
+                        <div id="connectionStatus" class="text-green-300 font-bold">⚡ Realtime</div>
+                        <div id="cartCount">0 item</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div id="transactionPage" class="container mx-auto p-4 pb-32 space-y-4">
+            <!-- Search -->
+            <div class="bg-white p-4 rounded-xl card-shadow">
+                <div class="flex flex-col md:flex-row gap-3">
+                    <div class="flex-1">
+                        <input type="text" id="productSearch" placeholder="Cari produk atau scan barcode..." class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-adamart-500">
+                    </div>
+                    <select id="productSelect" class="md:w-48 p-3 border rounded-lg bg-white">
+                        <option value="">Pilih Manual...</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Grid -->
+            <div id="productGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+            <!-- Cart -->
+            <div class="bg-white p-4 rounded-xl card-shadow fixed bottom-0 left-0 right-0 md:relative md:bottom-auto border-t md:border-0 z-20">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-lg">🛒 Keranjang</h3>
+                    <button onclick="clearCart()" class="text-red-500 text-sm font-medium">Kosongkan</button>
+                </div>
+                <div id="cartItems" class="max-h-40 md:max-h-60 overflow-y-auto mb-3 space-y-2"></div>
+                <div class="border-t pt-3">
+                    <div class="flex justify-between font-bold text-xl mb-3">
+                        <span>Total:</span>
+                        <span id="totalAmount" class="text-adamart-600">Rp 0</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                        <button onclick="selectPaymentMethod('Tunai')" id="payTunai" class="payment-btn bg-gray-100 p-2 rounded text-sm font-medium">💵 Tunai</button>
+                        <button onclick="selectPaymentMethod('QRIS')" id="payQRIS" class="payment-btn bg-gray-100 p-2 rounded text-sm font-medium">📱 QRIS</button>
+                        <button onclick="selectPaymentMethod('Kasbon')" id="payKasbon" class="payment-btn bg-gray-100 p-2 rounded text-sm font-medium">📝 Kasbon</button>
+                    </div>
+                    <button onclick="processTransaction()" id="checkoutBtn" disabled class="w-full bg-adamart-600 text-white py-3 rounded-lg font-bold disabled:bg-gray-300">Bayar Sekarang</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report Page -->
+        <div id="reportPage" class="hidden container mx-auto p-4 pb-20">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Lapor Barang</h2>
+                <button onclick="showTransactionPage()" class="text-adamart-600 font-medium">← Kembali</button>
+            </div>
+            <div class="bg-white p-4 rounded-xl card-shadow">
+                <form id="reportForm" class="space-y-4">
+                    <select id="reportProductSelect" class="w-full p-3 border rounded-lg" required><option value="">Pilih Produk...</option></select>
+                    <div class="grid grid-cols-2 gap-4">
+                        <input type="number" id="reportQuantity" placeholder="Jumlah" class="p-3 border rounded-lg" required>
+                        <select id="reportReason" class="p-3 border rounded-lg" required>
+                            <option value="Rusak">Rusak</option>
+                            <option value="Expired">Expired</option>
+                        </select>
+                    </div>
+                    <textarea id="reportNotes" placeholder="Catatan..." class="w-full p-3 border rounded-lg"></textarea>
+                    <button type="submit" class="w-full bg-red-600 text-white py-3 rounded-lg font-bold">Kirim Laporan</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="kasbonModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 class="font-bold text-lg mb-4">Data Kasbon</h3>
+            <form id="kasbonForm" class="space-y-3">
+                <input type="text" id="memberNumber" placeholder="No. Anggota Koperasi" class="w-full p-3 border rounded-lg" required>
+                <input type="text" id="minePermit" placeholder="No. Mine Permit" class="w-full p-3 border rounded-lg" required>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeKasbonModal()" class="flex-1 py-2 bg-gray-200 rounded-lg">Batal</button>
+                    <button type="submit" class="flex-1 py-2 bg-adamart-600 text-white rounded-lg">Lanjut</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="receiptModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <div class="text-center mb-4 text-green-600 font-bold text-lg">✅ Transaksi Berhasil</div>
+            <div id="receiptContent" class="bg-gray-50 p-4 rounded-lg text-sm mb-4 font-sans"></div>
+            <div class="flex gap-3">
+                <button onclick="closeReceiptModal()" class="flex-1 py-2 bg-gray-200 rounded-lg">Tutup</button>
+                <button onclick="sendToWhatsApp()" class="flex-1 py-2 bg-green-600 text-white rounded-lg">Kirim WA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="hidden fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl z-50 animate-bounce"></div>
+
+    <script>
+        // UPDATE: NEW APPS SCRIPT URL
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwkZVsoGXdgxck4xwOXk2fW4Oawn6diXu2bUX0sAIRFCfGeS1jTr6QjEH6Fr6-RFbnDAw/exec';
+        
+        let currentArea = '', availableProducts = [], cart = [], selectedPaymentMethod = '', lastTransaction = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('productSearch').addEventListener('input', filterProducts);
+            document.getElementById('productSelect').addEventListener('change', selectProduct);
+            document.getElementById('reportForm').addEventListener('submit', submitReport);
+            document.getElementById('kasbonForm').addEventListener('submit', processKasbonTransaction);
+        });
+
+        async function selectArea(area) {
+            currentArea = area;
+            document.getElementById('areaSelection').classList.add('hidden');
+            document.getElementById('loadingScreen').classList.remove('hidden');
+            
+            // Wait for Firebase SDK to load
+            const checkDb = setInterval(async () => {
+                if (window.db) {
+                    clearInterval(checkDb);
+                    await loadProducts();
+                    document.getElementById('loadingScreen').classList.add('hidden');
+                    document.getElementById('cashierInterface').classList.remove('hidden');
+                    document.getElementById('currentArea').textContent = `Area: ${area}`;
+                }
+            }, 100);
+        }
+
+        // FIREBASE READ
+        async function loadProducts() {
+            try {
+                const q = window.query(window.collection(window.db, "products"));
+                const querySnapshot = await window.getDocs(q);
+                const products = [];
+                querySnapshot.forEach((doc) => {
+                    products.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Filter based on stock key
+                const stockKey = `Stok Area Kasir ${currentArea}`;
+                availableProducts = products.filter(p => (p[stockKey] || 0) > 0);
+                
+                populateSelects();
+                displayProducts();
+            } catch (e) {
+                console.error("Firebase Error:", e);
+                showToast("Gagal memuat data", true);
+            }
+        }
+
+        function populateSelects() {
+            const select = document.getElementById('productSelect');
+            const reportSelect = document.getElementById('reportProductSelect');
+            select.innerHTML = '<option value="">Pilih Produk...</option>';
+            reportSelect.innerHTML = '<option value="">Pilih Produk...</option>';
+            
+            availableProducts.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.Barcode;
+                opt.textContent = `${p['Nama Produk']} - Rp ${p.Harga}`;
+                select.appendChild(opt);
+                reportSelect.appendChild(opt.cloneNode(true));
+            });
+        }
+
+        function displayProducts(products = availableProducts) {
+            const grid = document.getElementById('productGrid');
+            grid.innerHTML = products.map(p => `
+                <div class="bg-white p-4 rounded-xl card-shadow product-card flex justify-between items-center">
+                    <div>
+                        <h4 class="font-bold text-gray-800">${p['Nama Produk']}</h4>
+                        <p class="text-sm text-gray-500">${p.Barcode}</p>
+                        <p class="text-adamart-600 font-bold mt-1">Rp ${p.Harga.toLocaleString('id-ID')}</p>
+                    </div>
+                    <button onclick="addToCart('${p.Barcode}')" class="bg-adamart-100 text-adamart-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-adamart-200">
+                        + Beli
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function filterProducts() {
+            const term = document.getElementById('productSearch').value.toLowerCase();
+            const filtered = availableProducts.filter(p => 
+                String(p['Nama Produk']).toLowerCase().includes(term) || 
+                String(p.Barcode).toLowerCase().includes(term)
+            );
+            displayProducts(filtered);
+        }
+
+        function selectProduct() {
+            const val = document.getElementById('productSelect').value;
+            if(val) { addToCart(val); document.getElementById('productSelect').value = ''; }
+        }
+
+        function addToCart(barcode) {
+            const product = availableProducts.find(p => String(p.Barcode) == barcode);
+            if (!product) return showToast("Produk error", true);
+
+            const existing = cart.find(i => i.barcode == barcode);
+            if(existing) existing.quantity++;
+            else cart.push({ 
+                barcode: product.Barcode, 
+                name: product['Nama Produk'], 
+                price: product.Harga, 
+                quantity: 1,
+                docId: product.id // Simpan Doc ID Firestore untuk update nanti
+            });
+            
+            updateCartDisplay();
+            showToast("Produk masuk keranjang");
+        }
+
+        function updateCartDisplay() {
+            const container = document.getElementById('cartItems');
+            const totalEl = document.getElementById('totalAmount');
+            const countEl = document.getElementById('cartCount');
+            const btn = document.getElementById('checkoutBtn');
+
+            if (cart.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 py-4">Keranjang Kosong</div>';
+                totalEl.textContent = 'Rp 0';
+                countEl.textContent = '0 item';
+                btn.disabled = true;
+                return;
+            }
+
+            let total = 0, count = 0;
+            container.innerHTML = cart.map((item, idx) => {
+                total += item.price * item.quantity;
+                count += item.quantity;
+                return `
+                    <div class="flex justify-between items-center bg-gray-50 p-2 rounded">
+                        <div class="flex-1">
+                            <div class="font-bold text-sm">${item.name}</div>
+                            <div class="text-xs text-gray-500">Rp ${item.price} x ${item.quantity}</div>
+                        </div>
+                        <div class="flex gap-2 items-center">
+                            <button onclick="modQty(${idx}, -1)" class="w-6 h-6 bg-red-100 text-red-600 rounded">-</button>
+                            <span class="font-bold text-sm">${item.quantity}</span>
+                            <button onclick="modQty(${idx}, 1)" class="w-6 h-6 bg-green-100 text-green-600 rounded">+</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            totalEl.textContent = `Rp ${total.toLocaleString('id-ID')}`;
+            countEl.textContent = `${count} item`;
+            btn.disabled = !selectedPaymentMethod;
+        }
+
+        function modQty(idx, change) {
+            cart[idx].quantity += change;
+            if(cart[idx].quantity <= 0) cart.splice(idx, 1);
+            updateCartDisplay();
+        }
+
+        function clearCart() { cart = []; updateCartDisplay(); }
+
+        function selectPaymentMethod(method) {
+            selectedPaymentMethod = method;
+            document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('bg-adamart-100', 'text-adamart-700', 'ring-2', 'ring-adamart-500'));
+            const btn = document.getElementById('pay' + method);
+            btn.classList.add('bg-adamart-100', 'text-adamart-700', 'ring-2', 'ring-adamart-500');
+            updateCartDisplay();
+        }
+
+        function processTransaction() {
+            if(selectedPaymentMethod === 'Kasbon') {
+                document.getElementById('kasbonModal').classList.remove('hidden');
+            } else {
+                executeTransaction();
+            }
+        }
+
+        function closeKasbonModal() { document.getElementById('kasbonModal').classList.add('hidden'); }
+        
+        function processKasbonTransaction(e) {
+            e.preventDefault();
+            const m = document.getElementById('memberNumber').value;
+            const p = document.getElementById('minePermit').value;
+            closeKasbonModal();
+            executeTransaction({memberNumber: m, minePermit: p});
+        }
+
+        // HYBRID TRANSACTION LOGIC
+        async function executeTransaction(extraData = {}) {
+            try {
+                const data = {
+                    area: currentArea,
+                    items: cart.map(i => `${i.name} x${i.quantity}`).join(', '),
+                    total: cart.reduce((s, i) => s + (i.price * i.quantity), 0),
+                    method: selectedPaymentMethod,
+                    cart: cart,
+                    ...extraData,
+                    timestamp: new Date().toISOString()
+                };
+
+                // 1. Write to Firestore (FAST & REALTIME)
+                await window.addDoc(window.collection(window.db, "sales"), data);
+
+                // 2. Update Stock in Firestore
+                const stockKey = `Stok Area Kasir ${currentArea}`;
+                for (const item of cart) {
+                    const productRef = window.doc(window.db, "products", item.docId);
+                    await window.updateDoc(productRef, {
+                        [stockKey]: window.increment(-item.quantity)
+                    });
+                }
+
+                // 3. Send to Sheet (BACKGROUND BACKUP)
+                fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({action: 'record_sale', data: data})
+                }).catch(err => console.log("Sheet backup failed, but Firebase ok"));
+
+                // UI Feedback
+                lastTransaction = data;
+                showReceipt();
+                resetTransaction();
+                showToast("Transaksi Berhasil!");
+                loadProducts(); // Reload local data
+
+            } catch (e) {
+                console.error(e);
+                showToast("Gagal memproses transaksi", true);
+            }
+        }
+
+        async function submitReport(e) {
+            e.preventDefault();
+            const barcode = document.getElementById('reportProductSelect').value;
+            const product = availableProducts.find(p => String(p.Barcode) == barcode);
+            if(!product) return;
+
+            const data = {
+                barcode: barcode,
+                name: product['Nama Produk'],
+                quantity: parseInt(document.getElementById('reportQuantity').value),
+                reason: document.getElementById('reportReason').value,
+                area: currentArea,
+                notes: document.getElementById('reportNotes').value,
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                // Firebase Report
+                await window.addDoc(window.collection(window.db, "reports"), data);
+                
+                // Firebase Stock Deduct
+                const stockKey = `Stok Area Kasir ${currentArea}`;
+                const productRef = window.doc(window.db, "products", product.id);
+                await window.updateDoc(productRef, {
+                    [stockKey]: window.increment(-data.quantity)
+                });
+
+                // Sheet Backup
+                fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({action: 'report_item', data: data})
+                });
+
+                showToast("Laporan Terkirim");
+                document.getElementById('reportForm').reset();
+                showTransactionPage();
+                loadProducts();
+            } catch(e) {
+                showToast("Gagal lapor", true);
+            }
+        }
+
+        // Helper Functions
+        function showReceipt() {
+            const t = lastTransaction;
+            let html = `
+                <div class="text-center mb-4 font-bold text-lg">ADAMART</div>
+                <div class="text-xs text-gray-500 text-center mb-4">${new Date().toLocaleString()} | ${t.area}</div>
+                <div class="border-y border-dashed py-2 mb-2 space-y-2">
+            `;
+            t.cart.forEach(i => {
+                html += `
+                    <div>
+                        <div>${i.name}</div>
+                        <div class="flex justify-between text-gray-500">
+                            <span>${i.quantity} x ${i.price.toLocaleString()}</span>
+                            <span>${(i.quantity * i.price).toLocaleString()}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>
+                <div class="flex justify-between font-bold text-lg"><span>TOTAL</span><span>Rp ${t.total.toLocaleString()}</span></div>
+                <div class="flex justify-between text-sm mt-1"><span>Bayar</span><span>${t.method}</span></div>
+            `;
+            if(t.memberNumber) {
+                html += `<div class="mt-3 pt-2 border-t border-dashed text-xs"><div class="font-bold">KASBON INFO</div><div>NIA: ${t.memberNumber}</div><div>MP: ${t.minePermit}</div></div>`;
+            }
+            document.getElementById('receiptContent').innerHTML = html;
+            document.getElementById('receiptModal').classList.remove('hidden');
+        }
+
+        function sendToWhatsApp() {
+            const t = lastTransaction;
+            let text = `*ADAMART POS*\nArea: ${t.area}\nDate: ${new Date().toLocaleString()}\n----------------\n`;
+            t.cart.forEach(i => { text += `${i.name}\n${i.quantity} x ${i.price} = ${(i.quantity*i.price)}\n`; });
+            text += `----------------\n*TOTAL: Rp ${t.total.toLocaleString()}*\nMetode: ${t.method}`;
+            if(t.memberNumber) text += `\n(KASBON) NIA:${t.memberNumber} MP:${t.minePermit}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        function resetTransaction() {
+            cart = []; selectedPaymentMethod = '';
+            document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('bg-adamart-100', 'text-adamart-700', 'ring-2'));
+            updateCartDisplay();
+        }
+
+        function showToast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-xl z-50 animate-bounce ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
+            t.classList.remove('hidden');
+            setTimeout(() => t.classList.add('hidden'), 3000);
+        }
+
+        function showTransactionPage() { document.getElementById('reportPage').classList.add('hidden'); document.getElementById('transactionPage').classList.remove('hidden'); }
+        function showReportPage() { document.getElementById('transactionPage').classList.add('hidden'); document.getElementById('reportPage').classList.remove('hidden'); }
+        function closeReceiptModal() { document.getElementById('receiptModal').classList.add('hidden'); }
+        function changeArea() { location.reload(); }
+    </script>
+</body>
+</html>
