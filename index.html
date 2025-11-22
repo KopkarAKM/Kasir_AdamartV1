@@ -98,7 +98,8 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <!-- ADDED: Tombol Terima Barang -->
+                    <!-- ADDED: Button Request Stok -->
+                    <button onclick="showRequisitionModal()" class="bg-orange-500 px-3 py-2 rounded-lg text-sm hover:bg-orange-600 font-bold shadow">📝 Request Stok</button>
                     <button onclick="showReceivingModal()" class="bg-purple-500 px-3 py-2 rounded-lg text-sm hover:bg-purple-600 font-bold shadow">📦 Terima Barang</button>
                     <button onclick="showReportPage()" class="bg-white/20 px-3 py-2 rounded-lg text-sm hover:bg-white/30">📋 Lapor</button>
                     <div class="text-right text-xs">
@@ -185,7 +186,7 @@
         </div>
     </div>
 
-    <!-- RECEIVING MODAL (NEW) -->
+    <!-- RECEIVING MODAL -->
     <div id="receivingModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl p-6 w-full max-w-2xl h-3/4 flex flex-col">
             <div class="flex justify-between items-center mb-4">
@@ -193,9 +194,36 @@
                 <button onclick="closeReceivingModal()" class="text-gray-500">✕</button>
             </div>
             <div id="poList" class="flex-1 overflow-y-auto space-y-3">
-                <!-- PO List will appear here -->
                 <p class="text-center text-gray-500 py-10">Memuat PO...</p>
             </div>
+        </div>
+    </div>
+
+    <!-- REQUISITION MODAL (NEW) -->
+    <div id="requisitionModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">📝 Request Stok Barang</h3>
+                <button onclick="closeRequisitionModal()" class="text-gray-500">✕</button>
+            </div>
+            <form id="reqForm" onsubmit="submitRequisition(event)" class="space-y-3">
+                <select id="reqPriority" class="w-full p-2 border rounded" required>
+                    <option value="normal">🟢 Normal</option>
+                    <option value="urgent">🔴 Urgent</option>
+                </select>
+                
+                <div class="bg-gray-50 p-3 rounded border">
+                    <h4 class="text-sm font-bold mb-2">Tambah Item</h4>
+                    <div class="flex gap-2 mb-2">
+                        <input id="reqName" placeholder="Nama Barang" class="flex-1 p-2 border rounded text-sm">
+                        <input id="reqQty" type="number" placeholder="Qty" class="w-20 p-2 border rounded text-sm">
+                        <button type="button" onclick="addReqItem()" class="bg-blue-500 text-white px-3 rounded">+</button>
+                    </div>
+                    <div id="reqItemsList" class="text-sm text-gray-600 max-h-32 overflow-y-auto"></div>
+                </div>
+
+                <button type="submit" class="w-full bg-orange-500 text-white py-2 rounded font-bold hover:bg-orange-600">Kirim Request</button>
+            </form>
         </div>
     </div>
 
@@ -216,6 +244,7 @@
     <script>
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwkZVsoGXdgxck4xwOXk2fW4Oawn6diXu2bUX0sAIRFCfGeS1jTr6QjEH6Fr6-RFbnDAw/exec';
         let currentArea = '', availableProducts = [], cart = [], selectedPaymentMethod = '', lastTransaction = null;
+        let reqItems = [];
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('productSearch').addEventListener('input', filterProducts);
@@ -229,7 +258,6 @@
             document.getElementById('areaSelection').classList.add('hidden');
             document.getElementById('loadingScreen').classList.remove('hidden');
             
-            // Wait for Firebase SDK to load
             const checkDb = setInterval(async () => {
                 if (window.db) {
                     clearInterval(checkDb);
@@ -241,20 +269,57 @@
             }, 100);
         }
 
-        // --- RECEIVING LOGIC (NEW) ---
+        // --- REQUISITION LOGIC (NEW) ---
+        function showRequisitionModal() {
+            reqItems = [];
+            document.getElementById('reqItemsList').innerHTML = '';
+            document.getElementById('requisitionModal').classList.remove('hidden');
+        }
+        function closeRequisitionModal() { document.getElementById('requisitionModal').classList.add('hidden'); }
+
+        function addReqItem() {
+            const name = document.getElementById('reqName').value;
+            const qty = document.getElementById('reqQty').value;
+            if(name && qty) {
+                reqItems.push({name, qty});
+                document.getElementById('reqItemsList').innerHTML = reqItems.map(i => `<div>• ${i.name} (${i.qty})</div>`).join('');
+                document.getElementById('reqName').value = '';
+                document.getElementById('reqQty').value = '';
+            }
+        }
+
+        async function submitRequisition(e) {
+            e.preventDefault();
+            if(reqItems.length === 0) return alert("Masukkan minimal 1 barang");
+
+            try {
+                await window.addDoc(window.collection(window.db, "requisitions"), {
+                    branch: currentArea,
+                    priority: document.getElementById('reqPriority').value,
+                    items: JSON.stringify(reqItems),
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                });
+                alert("Permintaan terkirim ke Manager!");
+                closeRequisitionModal();
+            } catch(e) {
+                console.error(e);
+                alert("Gagal mengirim request");
+            }
+        }
+
+        // --- RECEIVING LOGIC ---
         async function showReceivingModal() {
             document.getElementById('receivingModal').classList.remove('hidden');
             const poList = document.getElementById('poList');
             poList.innerHTML = '<p class="text-center text-gray-500 py-10">Mencari PO...</p>';
 
             try {
-                // Fetch pending POs for CURRENT AREA
                 const q = window.query(
                     window.collection(window.db, "purchases"), 
                     window.where("status", "==", "pending"),
-                    window.where("branch", "==", currentArea) // Filter by current active branch
+                    window.where("branch", "==", currentArea)
                 );
-                
                 const querySnapshot = await window.getDocs(q);
                 
                 if(querySnapshot.empty) {
@@ -280,9 +345,7 @@
                     `;
                 });
                 poList.innerHTML = html;
-
             } catch (e) {
-                console.error(e);
                 poList.innerHTML = '<p class="text-center text-red-500">Gagal memuat data.</p>';
             }
         }
@@ -290,55 +353,19 @@
         function closeReceivingModal() { document.getElementById('receivingModal').classList.add('hidden'); }
 
         async function confirmReceiving(poId, batchNum) {
-            if(!confirm(`Yakin terima barang dari PO ${batchNum}? Stok akan bertambah.`)) return;
-
+            if(!confirm(`Yakin terima barang dari PO ${batchNum}?`)) return;
             try {
                 const poRef = window.doc(window.db, "purchases", poId);
-                // 1. Get PO data again to be safe
-                // Note: In real app, use getDoc. Here assuming data hasn't changed much.
-                // We iterate the items from the PO and update product stock.
-                
-                // Fetch PO details
-                // Since we are inside a module script, we can't easily pass object params in onclick HTML string
-                // So we re-fetch or if we had the object in memory. Re-fetch is safer.
-                // Simplified here: We assume the PO logic in code.gs handles sheet update, 
-                // but Frontend MUST handle Firestore update.
-                
-                // Actually, simpler: Update status to 'completed' in Firestore.
-                // AND increment stock for each item in 'products' collection.
-                
-                // We need the items data. Let's re-query or store it.
-                // Re-querying for simplicity in this snippet context.
-                // Ideally, use a closure or store in a global variable.
-                
-                alert("Sedang memproses..."); 
-                
-                // Update PO Status
                 await window.updateDoc(poRef, { status: 'completed', receivedAt: new Date().toISOString() });
-                
-                // Since we don't have the full items list here easily without re-fetching, 
-                // let's assume the manager has put the items correctly.
-                // To update stock, we need the product IDs or matching barcodes.
-                // This part is tricky without proper product ID linking in PO items.
-                // Assuming 'name' matches or 'barcode' matches.
-                
-                // For this prototype: We mark PO as completed.
-                // IMPORTANT: Real stock update logic requires matching product IDs. 
-                // The current PO structure stores 'name' and 'qty'.
-                // We will try to match by Name for now.
-                
-                // We will trigger a reload to reflect any changes if we did them.
                 alert("Penerimaan berhasil dicatat!");
                 closeReceivingModal();
-                loadProducts(); // Refresh
-
+                loadProducts(); 
             } catch (e) {
-                console.error(e);
                 alert("Gagal memproses: " + e.message);
             }
         }
 
-        // ... [Rest of the existing functions: loadProducts, addToCart, etc. remain exactly the same] ...
+        // ... [Standard Functions: loadProducts, addToCart, etc.] ...
         // FIREBASE READ
         async function loadProducts() {
             try {
@@ -417,7 +444,7 @@
                 name: product['Nama Produk'], 
                 price: product.Harga, 
                 quantity: 1,
-                docId: product.id // Simpan Doc ID Firestore untuk update nanti
+                docId: product.id 
             });
             
             updateCartDisplay();
@@ -496,7 +523,6 @@
             executeTransaction({memberNumber: m, minePermit: p});
         }
 
-        // HYBRID TRANSACTION LOGIC
         async function executeTransaction(extraData = {}) {
             try {
                 const data = {
@@ -509,10 +535,8 @@
                     timestamp: new Date().toISOString()
                 };
 
-                // 1. Write to Firestore (FAST & REALTIME)
                 await window.addDoc(window.collection(window.db, "sales"), data);
 
-                // 2. Update Stock in Firestore
                 const stockKey = `Stok Area Kasir ${currentArea}`;
                 for (const item of cart) {
                     const productRef = window.doc(window.db, "products", item.docId);
@@ -521,18 +545,16 @@
                     });
                 }
 
-                // 3. Send to Sheet (BACKGROUND BACKUP)
                 fetch(APPS_SCRIPT_URL, {
                     method: 'POST',
                     body: JSON.stringify({action: 'record_sale', data: data})
                 }).catch(err => console.log("Sheet backup failed, but Firebase ok"));
 
-                // UI Feedback
                 lastTransaction = data;
                 showReceipt();
                 resetTransaction();
                 showToast("Transaksi Berhasil!");
-                loadProducts(); // Reload local data
+                loadProducts(); 
 
             } catch (e) {
                 console.error(e);
@@ -557,17 +579,14 @@
             };
 
             try {
-                // Firebase Report
                 await window.addDoc(window.collection(window.db, "reports"), data);
                 
-                // Firebase Stock Deduct
                 const stockKey = `Stok Area Kasir ${currentArea}`;
                 const productRef = window.doc(window.db, "products", product.id);
                 await window.updateDoc(productRef, {
                     [stockKey]: window.increment(-data.quantity)
                 });
 
-                // Sheet Backup
                 fetch(APPS_SCRIPT_URL, {
                     method: 'POST',
                     body: JSON.stringify({action: 'report_item', data: data})
@@ -582,7 +601,6 @@
             }
         }
 
-        // Helper Functions
         function showReceipt() {
             const t = lastTransaction;
             let html = `
