@@ -21,6 +21,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         
+        // Expose functions to window for global access
         window.db = db;
         window.collection = collection;
         window.getDocs = getDocs;
@@ -30,6 +31,8 @@
         window.query = query;
         window.where = where;
         window.increment = increment;
+        
+        document.dispatchEvent(new Event('firebase-ready'));
     </script>
 
     <script>
@@ -46,6 +49,7 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
+    <!-- Area Selection -->
     <div id="areaSelection" class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-8 card-shadow max-w-md w-full fade-in">
             <div class="text-center mb-8"><div class="text-6xl mb-4">⚡</div><h1 class="text-2xl font-bold text-gray-800 mb-2">Adamart Hybrid</h1><p class="text-gray-600">Sistem Kasir Real-time</p></div>
@@ -57,134 +61,335 @@
         </div>
     </div>
 
+    <!-- Loading -->
     <div id="loadingScreen" class="hidden min-h-screen flex items-center justify-center p-4">
         <div class="text-center"><div class="loading bg-adamart-500 w-16 h-16 rounded-full mx-auto mb-4"></div><h3 class="text-xl font-bold text-gray-800">Menghubungkan...</h3></div>
     </div>
 
-    <div id="cashierInterface" class="hidden">
-        <header class="gradient-bg text-white p-4 sticky top-0 z-30 shadow-lg">
+    <!-- Cashier Interface -->
+    <div id="cashierInterface" class="hidden flex flex-col h-screen">
+        <header class="bg-gradient-to-r from-blue-600 to-purple-700 text-white p-3 shadow-lg shrink-0">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <button onclick="changeArea()" class="bg-white/20 p-2 rounded-lg hover:bg-white/30">🔄</button>
-                    <div><h1 class="text-lg font-bold">Adamart POS</h1><p id="currentArea" class="text-xs opacity-90">Area: -</p></div>
+                    <div class="leading-tight">
+                        <h1 class="font-bold text-lg">Adamart POS</h1>
+                        <p id="currentArea" class="text-xs opacity-90 font-mono">-</p>
+                    </div>
+                    <div class="bg-white/20 px-2 py-1 rounded text-xs">
+                        Shift: <span id="shiftStatus" class="font-bold">TUTUP</span>
+                    </div>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button onclick="showRequisitionModal()" class="bg-orange-500 px-3 py-2 rounded-lg text-sm hover:bg-orange-600 font-bold shadow">📝 Request</button>
-                    <button onclick="showReceivingModal()" class="bg-purple-500 px-3 py-2 rounded-lg text-sm hover:bg-purple-600 font-bold shadow">📦 Terima Barang</button>
-                    <button onclick="showReportPage()" class="bg-white/20 px-3 py-2 rounded-lg text-sm hover:bg-white/30">📋 Lapor</button>
-                    <div class="text-right text-xs"><div id="connectionStatus" class="text-green-300 font-bold">⚡ Realtime</div><div id="cartCount">0 item</div></div>
+                <div class="flex gap-2">
+                    <button onclick="showReceivingModal()" class="bg-purple-500 px-3 py-1.5 rounded text-xs font-bold hover:bg-purple-600">📦 Terima</button>
+                    <button onclick="showRequisitionModal()" class="bg-orange-500 px-3 py-1.5 rounded text-xs font-bold hover:bg-orange-600">📝 Req</button>
+                    <button onclick="closeShiftModal()" class="bg-red-500 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-600">🛑 Tutup Shift</button>
                 </div>
             </div>
         </header>
 
-        <div id="transactionPage" class="container mx-auto p-4 pb-32 space-y-4">
-            <div class="bg-white p-4 rounded-xl card-shadow">
-                <div class="flex flex-col md:flex-row gap-3">
-                    <div class="flex-1"><input type="text" id="productSearch" placeholder="Cari produk atau scan barcode..." class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-adamart-500"></div>
-                    <select id="productSelect" class="md:w-48 p-3 border rounded-lg bg-white"><option value="">Pilih Manual...</option></select>
+        <div class="flex flex-1 overflow-hidden">
+            <!-- Left: Products -->
+            <div class="flex-1 flex flex-col p-4 overflow-hidden bg-gray-50">
+                <div class="bg-white p-3 rounded-lg shadow mb-3 flex gap-2">
+                    <input type="text" id="productSearch" placeholder="🔍 Cari nama / scan barcode..." class="flex-1 p-2 border rounded text-sm focus:ring-2 focus:ring-blue-500">
+                    <select id="productSelect" class="w-40 p-2 border rounded text-sm bg-white"><option value="">Manual...</option></select>
                 </div>
+                <div id="productGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto pr-1 pb-20"></div>
             </div>
-            <div id="productGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-            <div class="bg-white p-4 rounded-xl card-shadow fixed bottom-0 left-0 right-0 md:relative md:bottom-auto border-t md:border-0 z-20">
-                <div class="flex justify-between items-center mb-3"><h3 class="font-bold text-lg">🛒 Keranjang</h3><button onclick="clearCart()" class="text-red-500 text-sm font-medium">Kosongkan</button></div>
-                <div id="cartItems" class="max-h-40 md:max-h-60 overflow-y-auto mb-3 space-y-2"></div>
-                <div class="border-t pt-3">
-                    <div class="flex justify-between font-bold text-xl mb-3"><span>Total:</span><span id="totalAmount" class="text-adamart-600">Rp 0</span></div>
-                    <div class="grid grid-cols-3 gap-2 mb-3">
-                        <button onclick="selectPaymentMethod('Tunai')" id="payTunai" class="payment-btn bg-gray-100 p-2 rounded text-sm font-medium">💵 Tunai</button>
-                        <button onclick="selectPaymentMethod('QRIS')" id="payQRIS" class="payment-btn bg-gray-100 p-2 rounded text-sm font-medium">📱 QRIS</button>
-                        <button onclick="selectPaymentMethod('Kasbon')" id="payKasbon" class="payment-btn bg-gray-100 p-2 rounded text-sm font-medium">📝 Kasbon</button>
-                    </div>
-                    <button onclick="processTransaction()" id="checkoutBtn" disabled class="w-full bg-adamart-600 text-white py-3 rounded-lg font-bold disabled:bg-gray-300">Bayar Sekarang</button>
-                </div>
-            </div>
-        </div>
 
-        <div id="reportPage" class="hidden container mx-auto p-4 pb-20">
-            <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">Lapor Barang</h2><button onclick="showTransactionPage()" class="text-adamart-600 font-medium">← Kembali</button></div>
-            <div class="bg-white p-4 rounded-xl card-shadow">
-                <form id="reportForm" class="space-y-4">
-                    <select id="reportProductSelect" class="w-full p-3 border rounded-lg" required><option value="">Pilih Produk...</option></select>
-                    <div class="grid grid-cols-2 gap-4"><input type="number" id="reportQuantity" placeholder="Jumlah" class="p-3 border rounded-lg" required><select id="reportReason" class="p-3 border rounded-lg" required><option value="Rusak">Rusak</option><option value="Expired">Expired</option></select></div>
-                    <textarea id="reportNotes" placeholder="Catatan..." class="w-full p-3 border rounded-lg"></textarea>
-                    <button type="submit" class="w-full bg-red-600 text-white py-3 rounded-lg font-bold">Kirim Laporan</button>
-                </form>
+            <!-- Right: Cart -->
+            <div class="w-96 bg-white shadow-xl flex flex-col border-l border-gray-200 z-20">
+                <div class="p-3 border-b bg-gray-50 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-700">🛒 Keranjang</h3>
+                    <button onclick="clearCart()" class="text-red-500 text-xs font-bold">Hapus Semua</button>
+                </div>
+                <div id="cartItems" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
+                <div class="p-4 border-t bg-gray-50">
+                    <div class="flex justify-between font-bold text-xl mb-3 text-gray-800"><span>Total</span><span id="totalAmount">Rp 0</span></div>
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                        <button onclick="selectPaymentMethod('Tunai')" id="payTunai" class="payment-btn bg-white border p-2 rounded text-xs font-bold hover:bg-blue-50">💵 Tunai</button>
+                        <button onclick="selectPaymentMethod('QRIS')" id="payQRIS" class="payment-btn bg-white border p-2 rounded text-xs font-bold hover:bg-blue-50">📱 QRIS</button>
+                        <button onclick="selectPaymentMethod('Kasbon')" id="payKasbon" class="payment-btn bg-white border p-2 rounded text-xs font-bold hover:bg-blue-50">📝 Kasbon</button>
+                    </div>
+                    <button onclick="processTransaction()" id="checkoutBtn" disabled class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold disabled:bg-gray-300 shadow-lg hover:bg-blue-700 transition">Bayar</button>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Modals -->
+    <!-- Open Shift Modal -->
+    <div id="openShiftModal" class="fixed inset-0 bg-gray-900 z-[60] flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-xl p-8 w-full max-w-md text-center shadow-2xl">
+            <div class="text-4xl mb-4">☀️</div>
+            <h2 class="text-2xl font-bold mb-2">Buka Shift Baru</h2>
+            <p class="text-gray-500 mb-6">Silakan hitung uang modal di laci kasir.</p>
+            <form onsubmit="startShift(event)" class="space-y-4 text-left">
+                <div><label class="font-bold text-sm text-gray-700">Nama Kasir</label><input type="text" id="shiftCashier" class="w-full p-3 border rounded-lg bg-gray-50" required placeholder="Nama Anda"></div>
+                <div><label class="font-bold text-sm text-gray-700">Modal Awal (Rp)</label><input type="number" id="startCash" class="w-full p-3 border rounded-lg font-mono text-lg bg-gray-50" required placeholder="0"></div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700">Buka Toko 🚀</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Close Shift Modal -->
+    <div id="closeShiftModal" class="hidden fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 class="font-bold text-lg mb-4 border-b pb-2">🛑 Rekapitulasi & Tutup Shift</h3>
+            <div class="space-y-2 mb-4 text-sm">
+                <div class="flex justify-between"><span>Kasir:</span> <span class="font-bold" id="cs-name">-</span></div>
+                <div class="flex justify-between"><span>Waktu Buka:</span> <span id="cs-time">-</span></div>
+                <div class="flex justify-between text-gray-500"><span>Modal Awal:</span> <span id="cs-start">0</span></div>
+                
+                <!-- Detailed Breakdown -->
+                <div class="my-2 pt-2 border-t border-dashed">
+                    <div class="flex justify-between text-blue-600 font-bold"><span>(+) Penjualan Tunai:</span> <span id="cs-sales">0</span></div>
+                    <div class="flex justify-between text-purple-600"><span>(i) Total QRIS:</span> <span id="cs-qris">0</span></div>
+                    <div class="flex justify-between text-orange-600"><span>(i) Total Kasbon:</span> <span id="cs-kasbon">0</span></div>
+                </div>
+
+                <div class="flex justify-between font-bold text-lg border-t pt-2 bg-gray-50 p-2 rounded">
+                    <span>Harus Ada Fisik:</span> <span id="cs-expected">0</span>
+                </div>
+                <p class="text-xs text-gray-400 text-center mt-1">(Modal Awal + Penjualan Tunai)</p>
+            </div>
+            <form onsubmit="finishShift(event)">
+                <div class="mb-4 bg-yellow-50 p-3 rounded border border-yellow-200">
+                    <label class="block text-xs font-bold text-gray-600 mb-1">UANG FISIK DI LACI (ACTUAL)</label>
+                    <input type="number" id="actualCash" class="w-full p-2 border rounded font-mono text-lg font-bold" required placeholder="Hitung uang fisik...">
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="document.getElementById('closeShiftModal').classList.add('hidden')" class="flex-1 py-2 bg-gray-200 rounded font-bold text-gray-600">Batal</button>
+                    <button type="submit" class="flex-1 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700">Simpan & Tutup</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Kasbon Modal -->
     <div id="kasbonModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl p-6 w-full max-w-md">
             <h3 class="font-bold text-lg mb-4 text-adamart-900">📝 Data Kasbon Karyawan</h3>
             <form id="kasbonForm" class="space-y-3">
-                <div>
-                    <label class="text-xs font-bold text-gray-600 block mb-1">Nama Karyawan</label>
-                    <input type="text" id="employeeName" placeholder="Nama Lengkap" class="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white" required>
-                </div>
+                <div><label class="text-xs font-bold text-gray-600 block mb-1">Nama Karyawan</label><input type="text" id="employeeName" placeholder="Nama Lengkap" class="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white" required></div>
                 <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-xs font-bold text-gray-600 block mb-1">No. Anggota (Opsional)</label>
-                        <input type="text" id="memberNumber" placeholder="Contoh: 2313" class="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white">
-                    </div>
-                    <div>
-                        <label class="text-xs font-bold text-gray-600 block mb-1">Mine Permit</label>
-                        <input type="text" id="minePermit" placeholder="Contoh: 1701238" class="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white" required>
-                    </div>
+                    <div><label class="text-xs font-bold text-gray-600 block mb-1">No. Anggota (Opsional)</label><input type="text" id="memberNumber" placeholder="Contoh: 2313" class="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white"></div>
+                    <div><label class="text-xs font-bold text-gray-600 block mb-1">Mine Permit</label><input type="text" id="minePermit" placeholder="Contoh: 1701238" class="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white" required></div>
                 </div>
                 <div class="flex gap-3 pt-4"><button type="button" onclick="closeKasbonModal()" class="flex-1 py-2 bg-gray-200 rounded-lg font-semibold text-gray-600 hover:bg-gray-300">Batal</button><button type="submit" class="flex-1 py-2 bg-adamart-600 text-white rounded-lg font-bold hover:bg-adamart-700 shadow">Lanjutkan</button></div>
             </form>
         </div>
     </div>
 
-    <div id="receivingModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl p-6 w-full max-w-2xl h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-lg">📦 Penerimaan Barang (PO)</h3>
-                <button onclick="closeReceivingModal()" class="text-gray-500">✕</button>
-            </div>
-            <div id="poList" class="flex-1 overflow-y-auto space-y-3">
-                <p class="text-center text-gray-500 py-10">Memuat PO...</p>
-            </div>
-            <div id="poVerification" class="hidden flex-1 flex flex-col overflow-hidden">
-                <div class="bg-blue-50 p-3 rounded-lg mb-4 text-sm border border-blue-200">
-                    <p><strong>PO Batch:</strong> <span id="verifyBatchNum">-</span></p>
-                    <p class="text-xs text-gray-600">Silakan cek fisik barang dan input tanggal kadaluarsa.</p>
-                </div>
-                <div id="verificationItems" class="flex-1 overflow-y-auto space-y-3 pr-2"></div>
-                <div class="border-t mt-4 pt-4 flex gap-3">
-                    <button onclick="backToPOList()" class="px-4 py-2 bg-gray-200 rounded-lg font-bold">Kembali</button>
-                    <button onclick="submitVerification()" class="flex-1 py-2 bg-green-600 text-white rounded-lg font-bold shadow hover:bg-green-700">✅ Simpan & Update Stok</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="requisitionModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl p-6 w-full max-w-md">
-            <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg">📝 Request Stok Barang</h3><button onclick="closeRequisitionModal()" class="text-gray-500">✕</button></div>
-            <form id="reqForm" onsubmit="submitRequisition(event)" class="space-y-3">
-                <select id="reqPriority" class="w-full p-2 border rounded" required><option value="normal">🟢 Normal</option><option value="urgent">🔴 Urgent</option></select>
-                <div class="bg-gray-50 p-3 rounded border"><h4 class="text-sm font-bold mb-2">Tambah Item</h4><div class="flex gap-2 mb-2"><input id="reqName" placeholder="Nama Barang" class="flex-1 p-2 border rounded text-sm"><input id="reqQty" type="number" placeholder="Qty" class="w-20 p-2 border rounded text-sm"><button type="button" onclick="addReqItem()" class="bg-blue-500 text-white px-3 rounded">+</button></div><div id="reqItemsList" class="text-sm text-gray-600 max-h-32 overflow-y-auto"></div></div>
-                <button type="submit" class="w-full bg-orange-500 text-white py-2 rounded font-bold hover:bg-orange-600">Kirim Request</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="receiptModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl p-6 w-full max-w-md">
-            <div class="text-center mb-4 text-green-600 font-bold text-lg">✅ Transaksi Berhasil</div>
-            <div id="receiptContent" class="bg-gray-50 p-4 rounded-lg text-sm mb-4 font-sans"></div>
-            <div class="flex gap-3"><button onclick="closeReceiptModal()" class="flex-1 py-2 bg-gray-200 rounded-lg">Tutup</button><button onclick="sendToWhatsApp()" class="flex-1 py-2 bg-green-600 text-white rounded-lg">Kirim WA</button></div>
-        </div>
-    </div>
-
-    <div id="toast" class="hidden fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl z-50 animate-bounce"></div>
+    <!-- Receiving Modal -->
+    <div id="receivingModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-xl p-6 w-full max-w-2xl h-[90vh] flex flex-col"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg">📦 Penerimaan Barang (PO)</h3><button onclick="closeReceivingModal()" class="text-gray-500">✕</button></div><div id="poList" class="flex-1 overflow-y-auto space-y-3"><p class="text-center text-gray-500 py-10">Memuat PO...</p></div><div id="poVerification" class="hidden flex-1 flex flex-col overflow-hidden"><div class="bg-blue-50 p-3 rounded-lg mb-4 text-sm border border-blue-200"><p><strong>PO Batch:</strong> <span id="verifyBatchNum">-</span></p><p class="text-xs text-gray-600">Silakan cek fisik barang dan input tanggal kadaluarsa.</p></div><div id="verificationItems" class="flex-1 overflow-y-auto space-y-3 pr-2"></div><div class="border-t mt-4 pt-4 flex gap-3"><button onclick="backToPOList()" class="px-4 py-2 bg-gray-200 rounded-lg font-bold">Kembali</button><button onclick="submitVerification()" class="flex-1 py-2 bg-green-600 text-white rounded-lg font-bold shadow hover:bg-green-700">✅ Simpan & Update Stok</button></div></div></div></div>
+    
+    <!-- Requisition Modal -->
+    <div id="requisitionModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-xl p-6 w-full max-w-md"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg">📝 Request Stok Barang</h3><button onclick="closeRequisitionModal()" class="text-gray-500">✕</button></div><form id="reqForm" onsubmit="submitRequisition(event)" class="space-y-3"><select id="reqPriority" class="w-full p-2 border rounded" required><option value="normal">🟢 Normal</option><option value="urgent">🔴 Urgent</option></select><div class="bg-gray-50 p-3 rounded border"><div class="flex gap-2 mb-2"><input id="reqName" placeholder="Nama" class="flex-1 p-2 border rounded text-sm"><input id="reqQty" type="number" placeholder="Qty" class="w-20 p-2 border rounded text-sm"><button type="button" onclick="addReqItem()" class="bg-blue-500 text-white px-3 rounded">+</button></div><div id="reqItemsList" class="text-sm text-gray-600 max-h-32 overflow-y-auto"></div></div><button type="submit" class="w-full bg-orange-500 text-white py-2 rounded font-bold">Kirim Request</button></form></div></div>
+    
+    <!-- Report Modal -->
+    <div id="reportPage" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-xl p-6 w-full max-w-md"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">Lapor Barang</h2><button onclick="closeReportPage()" class="text-gray-500">✕</button></div><form id="reportForm" class="space-y-4"><select id="reportProductSelect" class="w-full p-3 border rounded-lg" required><option value="">Pilih Produk...</option></select><div class="grid grid-cols-2 gap-4"><input type="number" id="reportQuantity" placeholder="Jumlah" class="p-3 border rounded-lg" required><select id="reportReason" class="p-3 border rounded-lg" required><option value="Rusak">Rusak</option><option value="Expired">Expired</option></select></div><textarea id="reportNotes" placeholder="Catatan..." class="w-full p-3 border rounded-lg"></textarea><button type="submit" class="w-full bg-red-600 text-white py-3 rounded-lg font-bold">Kirim Laporan</button></form></div></div>
+    
+    <!-- Receipt Modal -->
+    <div id="receiptModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-xl p-6 w-full max-w-md"><div class="text-center mb-4 text-green-600 font-bold text-lg">✅ Transaksi Berhasil</div><div id="receiptContent" class="bg-gray-50 p-4 rounded-lg text-sm mb-4 font-sans"></div><div class="flex gap-3"><button onclick="closeReceiptModal()" class="flex-1 py-2 bg-gray-200 rounded-lg">Tutup</button><button onclick="sendToWhatsApp()" class="flex-1 py-2 bg-green-600 text-white rounded-lg">Kirim WA</button></div></div></div>
+    
+    <!-- Toast -->
+    <div id="toast" class="hidden fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl z-[70] animate-bounce"></div>
 
     <script>
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwkZVsoGXdgxck4xwOXk2fW4Oawn6diXu2bUX0sAIRFCfGeS1jTr6QjEH6Fr6-RFbnDAw/exec';
         let currentArea = '', availableProducts = [], cart = [], selectedPaymentMethod = '', lastTransaction = null;
-        let reqItems = [];
-        let currentReceivingPO = null;
+        let activeShift = null; 
+        let reqItems = [], currentReceivingPO = null;
+
+        // --- HELPER FUNCTIONS (DEFINED FIRST) ---
+        function formatRp(n) { return "Rp " + (n || 0).toLocaleString('id-ID'); }
+        
+        function showToast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            if (!t) return;
+            t.textContent = msg;
+            t.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-xl z-[70] animate-bounce ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
+            t.classList.remove('hidden');
+            setTimeout(() => t.classList.add('hidden'), 3000);
+        }
+
+        function resetTransaction() {
+            cart = [];
+            selectedPaymentMethod = '';
+            document.querySelectorAll('.payment-btn').forEach(b => {
+                b.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-700');
+            });
+            updateCartDisplay();
+        }
+
+        function clearCart() {
+            cart = [];
+            updateCartDisplay();
+        }
+
+        function showReceipt() {
+            const t = lastTransaction;
+            if (!t) return;
+            let html = `<div class="text-center font-bold">ADAMART</div><div class="text-xs text-center">${new Date().toLocaleString()}</div><hr class="my-2">`;
+            t.cart.forEach(i => {
+                html += `<div class="flex justify-between text-sm"><span>${i.name} x${i.quantity}</span><span>${(i.price * i.quantity).toLocaleString()}</span></div>`;
+            });
+            html += `<hr class="my-2"><div class="flex justify-between font-bold"><span>TOTAL</span><span>${t.total.toLocaleString()}</span></div><div class="flex justify-between text-sm mt-1"><span>Bayar</span><span>${t.method}</span></div>`;
+            
+            if(t.memberNumber) {
+                html += `<div class="mt-3 pt-2 border-t border-dashed text-xs"><div class="font-bold">KASBON INFO</div><div>Nama/ID: ${t.memberNumber}</div><div>MP: ${t.minePermit}</div></div>`;
+            }
+            document.getElementById('receiptContent').innerHTML = html;
+            document.getElementById('receiptModal').classList.remove('hidden');
+        }
+
+        function sendToWhatsApp() {
+            const t = lastTransaction;
+            if (!t) return;
+            let text = `*ADAMART POS*\nArea: ${t.area}\nDate: ${new Date().toLocaleString()}\n----------------\n`;
+            t.cart.forEach(i => { text += `${i.name}\n${i.quantity} x ${i.price} = ${(i.quantity*i.price)}\n`; });
+            text += `----------------\n*TOTAL: Rp ${t.total.toLocaleString()}*\nMetode: ${t.method}`;
+            if(t.memberNumber) text += `\n(KASBON) Nama/ID:${t.memberNumber} MP:${t.minePermit}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        // Modal Control Functions
+        function showReportPage() { document.getElementById('reportPage').classList.remove('hidden'); }
+        function closeReportPage() { document.getElementById('reportPage').classList.add('hidden'); }
+        function closeReceiptModal() { document.getElementById('receiptModal').classList.add('hidden'); }
+        function closeKasbonModal() { document.getElementById('kasbonModal').classList.add('hidden'); }
+        function closeReceivingModal() { document.getElementById('receivingModal').classList.add('hidden'); }
+        function closeRequisitionModal() { document.getElementById('requisitionModal').classList.add('hidden'); }
+        function changeArea() { localStorage.removeItem('adamart_shift'); location.reload(); }
+
+        // --- CORE LOGIC ---
+
+        function initShift() {
+            const statusEl = document.getElementById('shiftStatus');
+            const modalEl = document.getElementById('openShiftModal');
+            
+            if (!statusEl || !modalEl) return; 
+
+            const savedShift = localStorage.getItem('adamart_shift');
+            if (savedShift) {
+                activeShift = JSON.parse(savedShift);
+                statusEl.textContent = activeShift.cashierName;
+                statusEl.className = "font-bold text-green-200";
+                modalEl.classList.add('hidden');
+            } else {
+                statusEl.textContent = "TUTUP";
+                modalEl.classList.remove('hidden');
+            }
+        }
+
+        // ... (rest of shift logic functions)
+
+        // Expose to window
+        window.resetTransaction = resetTransaction;
+        window.clearCart = clearCart;
+        window.showReceipt = showReceipt;
+        window.sendToWhatsApp = sendToWhatsApp;
+        window.showToast = showToast;
+        // ... other exposed functions
+
+        // [Rest of the script including Firebase logic...]
+        // ... (keeping the rest of the logic from previous correct version but re-ordered)
+        
+        function startShift(e) {
+            e.preventDefault();
+            const cashierName = document.getElementById('shiftCashier').value;
+            const startCash = parseInt(document.getElementById('startCash').value);
+            
+            const shiftData = {
+                id: 'SHIFT-' + Date.now(),
+                cashierName: cashierName,
+                startCash: startCash,
+                startTime: new Date().toISOString(),
+                area: currentArea
+            };
+            
+            activeShift = shiftData;
+            localStorage.setItem('adamart_shift', JSON.stringify(shiftData));
+            document.getElementById('openShiftModal').classList.add('hidden');
+            document.getElementById('shiftStatus').textContent = cashierName;
+            showToast(`Shift dibuka oleh ${cashierName}`);
+        }
+
+        async function closeShiftModal() {
+            if (!activeShift) return;
+            
+            const q = window.query(
+                window.collection(window.db, "sales"),
+                window.where("shiftId", "==", activeShift.id)
+            );
+            
+            const snap = await window.getDocs(q);
+            
+            let cashSales = 0, qrisSales = 0, kasbonSales = 0;
+
+            snap.forEach(doc => { 
+                const sale = doc.data();
+                if (sale.method === 'Tunai') cashSales += sale.total;
+                else if (sale.method === 'QRIS') qrisSales += sale.total;
+                else if (sale.method === 'Kasbon') kasbonSales += sale.total;
+            });
+
+            const expected = activeShift.startCash + cashSales;
+            
+            document.getElementById('cs-name').textContent = activeShift.cashierName;
+            document.getElementById('cs-time').textContent = new Date(activeShift.startTime).toLocaleTimeString();
+            document.getElementById('cs-start').textContent = formatRp(activeShift.startCash);
+            document.getElementById('cs-sales').textContent = formatRp(cashSales);
+            document.getElementById('cs-qris').textContent = formatRp(qrisSales);
+            document.getElementById('cs-kasbon').textContent = formatRp(kasbonSales);
+            document.getElementById('cs-expected').textContent = formatRp(expected);
+            
+            const modal = document.getElementById('closeShiftModal');
+            modal.dataset.expected = expected;
+            modal.dataset.cashSales = cashSales;
+            modal.dataset.qrisSales = qrisSales;
+            modal.dataset.kasbonSales = kasbonSales;
+            
+            modal.classList.remove('hidden');
+        }
+
+        async function finishShift(e) {
+            e.preventDefault();
+            const modal = document.getElementById('closeShiftModal');
+            const actual = parseInt(document.getElementById('actualCash').value);
+            const expected = parseInt(modal.dataset.expected);
+            const diff = actual - expected;
+
+            const shiftReport = {
+                shiftId: activeShift.id,
+                cashierName: activeShift.cashierName,
+                openTime: activeShift.startTime,
+                startCash: activeShift.startCash,
+                expectedCashSales: parseInt(modal.dataset.cashSales),
+                totalQris: parseInt(modal.dataset.qrisSales),
+                totalKasbon: parseInt(modal.dataset.kasbonSales),
+                actualCash: actual,
+                difference: diff,
+                area: currentArea
+            };
+
+            try {
+                await window.addDoc(window.collection(window.db, "shifts"), shiftReport);
+                
+                fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({action: 'record_shift', data: shiftReport})
+                });
+
+                localStorage.removeItem('adamart_shift');
+                activeShift = null;
+                alert(`Shift Ditutup.\nSelisih: ${formatRp(diff)}\nSilakan refresh.`);
+                location.reload();
+            } catch(err) {
+                alert("Error closing shift: " + err.message);
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('productSearch').addEventListener('input', filterProducts);
@@ -197,146 +402,110 @@
             currentArea = area;
             document.getElementById('areaSelection').classList.add('hidden');
             document.getElementById('loadingScreen').classList.remove('hidden');
-            const checkDb = setInterval(async () => { if (window.db) { clearInterval(checkDb); await loadProducts(); document.getElementById('loadingScreen').classList.add('hidden'); document.getElementById('cashierInterface').classList.remove('hidden'); document.getElementById('currentArea').textContent = `Area: ${area}`; } }, 100);
+            
+            const checkDb = setInterval(async () => {
+                if (window.db) {
+                    clearInterval(checkDb);
+                    await loadProducts();
+                    document.getElementById('loadingScreen').classList.add('hidden');
+                    document.getElementById('cashierInterface').classList.remove('hidden');
+                    document.getElementById('currentArea').textContent = `Area: ${area}`;
+                    initShift();
+                }
+            }, 100);
         }
 
-        // --- RECEIVING LOGIC ---
-        async function showReceivingModal() {
-            document.getElementById('receivingModal').classList.remove('hidden');
-            backToPOList();
-            const poList = document.getElementById('poList');
-            poList.innerHTML = '<p class="text-center text-gray-500 py-10">Mencari PO...</p>';
-            
-            const branchMap = { "adamart 73": "Adamart 73", "adamart induksi": "Adamart Induksi", "adamart kelanis": "Adamart Kelanis" };
-            const queryBranch = branchMap[currentArea] || currentArea;
+        function addToCart(barcode) {
+            const product = availableProducts.find(p => String(p.Barcode) == String(barcode));
+            if (!product) return showToast("Produk error", true);
 
-            try {
-                const q = window.query(window.collection(window.db, "purchases"), window.where("status", "==", "pending"), window.where("branch", "==", queryBranch));
-                const querySnapshot = await window.getDocs(q);
-                if(querySnapshot.empty) { poList.innerHTML = '<p class="text-center text-gray-500 py-10">Tidak ada barang masuk.</p>'; return; }
-                
-                let html = '';
-                querySnapshot.forEach((doc) => {
-                    const po = doc.data();
-                    const items = JSON.parse(po.items);
-                    const poDataStr = encodeURIComponent(JSON.stringify({ id: doc.id, ...po }));
-                    
-                    html += `
-                        <div class="border p-4 rounded-lg bg-gray-50 mb-2 hover:border-blue-400 transition">
-                            <div class="flex justify-between font-bold mb-2">
-                                <span class="text-blue-800">${po.batchNumber}</span>
-                                <span class="text-xs text-gray-500">${new Date(po.createdAt).toLocaleDateString()}</span>
+            const existing = cart.find(i => String(i.barcode) == String(barcode));
+            if(existing) existing.quantity++;
+            else cart.push({ 
+                barcode: product.Barcode, 
+                name: product['Nama Produk'], 
+                price: product.Harga, 
+                quantity: 1,
+                docId: product.id 
+            });
+            
+            updateCartDisplay();
+            showToast("Produk masuk keranjang");
+        }
+
+        function updateCartDisplay() {
+            const container = document.getElementById('cartItems');
+            const totalEl = document.getElementById('totalAmount');
+            const cartCountEl = document.getElementById('cartCount');
+            const btn = document.getElementById('checkoutBtn');
+
+            if (!container) return; 
+
+            let total = 0, count = 0;
+            
+            if (cart.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 py-4 text-sm">Keranjang Kosong</div>';
+            } else {
+                container.innerHTML = cart.map((item, idx) => {
+                    total += item.price * item.quantity;
+                    count += item.quantity;
+                    return `
+                        <div class="flex justify-between items-center bg-gray-50 p-2 rounded text-sm">
+                            <div class="flex-1">
+                                <div class="font-bold truncate">${item.name}</div>
+                                <div class="text-xs text-gray-500">Rp ${item.price} x ${item.quantity}</div>
                             </div>
-                            <div class="text-xs text-gray-600 mb-3">${items.length} Jenis Barang</div>
-                            <button onclick="openVerification('${poDataStr}')" class="w-full bg-blue-600 text-white py-2 rounded font-bold text-sm">Proses & Cek Barang</button>
-                        </div>`;
-                });
-                poList.innerHTML = html;
-            } catch (e) { console.error(e); poList.innerHTML = '<p class="text-center text-red-500">Gagal memuat data.</p>'; }
-        }
-
-        window.openVerification = (poStr) => {
-            currentReceivingPO = JSON.parse(decodeURIComponent(poStr));
-            const items = JSON.parse(currentReceivingPO.items);
-            
-            document.getElementById('poList').classList.add('hidden');
-            document.getElementById('poVerification').classList.remove('hidden');
-            document.getElementById('verifyBatchNum').textContent = currentReceivingPO.batchNumber;
-            
-            const container = document.getElementById('verificationItems');
-            container.innerHTML = items.map((item, idx) => `
-                <div class="bg-white border p-3 rounded-lg shadow-sm">
-                    <div class="font-bold text-gray-800 mb-1">${item.name}</div>
-                    <div class="text-xs text-gray-500 mb-2">Barcode: ${item.barcode || '-'}</div>
-                    <div class="grid grid-cols-2 gap-3 mb-2">
-                        <div><label class="text-xs font-bold text-gray-600 block mb-1">Jml Diterima</label><input type="number" id="rec-qty-${idx}" value="${item.qty}" class="w-full p-2 border rounded text-center font-bold bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500"></div>
-                        <div><label class="text-xs font-bold text-gray-600 block mb-1">Tgl Kadaluarsa</label><input type="date" id="rec-exp-${idx}" class="w-full p-2 border rounded text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500"></div>
-                    </div>
-                    <label class="flex items-center gap-2 text-sm cursor-pointer bg-green-50 p-2 rounded border border-green-100"><input type="checkbox" id="rec-check-${idx}" class="w-4 h-4 text-green-600 rounded focus:ring-green-500" checked><span class="text-green-800 font-medium">Kondisi Baik</span></label>
-                </div>
-            `).join('');
-        };
-
-        window.backToPOList = () => {
-            document.getElementById('poVerification').classList.add('hidden');
-            document.getElementById('poList').classList.remove('hidden');
-            currentReceivingPO = null;
-        };
-
-        window.submitVerification = async () => {
-            if(!currentReceivingPO) return;
-            if(!confirm("Pastikan semua data benar. Stok akan ditambahkan. Lanjutkan?")) return;
-
-            const items = JSON.parse(currentReceivingPO.items);
-            const stockKey = `Stok Area Kasir ${currentArea}`;
-            
-            for(let i=0; i<items.length; i++) {
-                const exp = document.getElementById(`rec-exp-${i}`).value;
-                if(!exp) return alert(`Harap isi tanggal kadaluarsa untuk ${items[i].name}`);
+                            <div class="flex gap-1 items-center">
+                                <button onclick="modQty(${idx}, -1)" class="w-5 h-5 bg-red-100 text-red-600 rounded flex items-center justify-center">-</button>
+                                <span class="font-bold w-6 text-center">${item.quantity}</span>
+                                <button onclick="modQty(${idx}, 1)" class="w-5 h-5 bg-green-100 text-green-600 rounded flex items-center justify-center">+</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             }
 
-            try {
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    const actualQty = parseInt(document.getElementById(`rec-qty-${i}`).value);
-                    const expiryDate = document.getElementById(`rec-exp-${i}`).value;
-                    const isGood = document.getElementById(`rec-check-${i}`).checked;
-
-                    if(actualQty > 0 && isGood) {
-                        let q = window.query(window.collection(window.db, "products"), window.where("Barcode", "==", item.barcode));
-                        let snapshot = await window.getDocs(q);
-                        
-                        if (!snapshot.empty) {
-                            const productDoc = snapshot.docs[0];
-                            await window.updateDoc(productDoc.ref, { 
-                                [stockKey]: window.increment(actualQty),
-                                "Tanggal Kadaluarsa": new Date(expiryDate).toISOString() 
-                            });
-                        } else {
-                            await window.addDoc(window.collection(window.db, "products"), {
-                                Barcode: item.barcode,
-                                "Nama Produk": item.name,
-                                Harga: parseInt(item.price),
-                                [stockKey]: actualQty,
-                                "Tanggal Kadaluarsa": new Date(expiryDate).toISOString()
-                            });
-                        }
-
-                        fetch(APPS_SCRIPT_URL, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                action: 'update_stock', 
-                                data: { 
-                                    barcode: item.barcode, 
-                                    name: item.name, 
-                                    price: item.price, 
-                                    area: currentArea, 
-                                    quantity: actualQty,
-                                    expiryDate: expiryDate
-                                }
-                            })
-                        });
-                    }
-                }
-                await window.updateDoc(window.doc(window.db, "purchases", currentReceivingPO.id), { status: 'completed', receivedAt: new Date().toISOString(), receivedBy: "Cashier" });
-                alert("Stok berhasil diupdate!");
-                closeReceivingModal();
-                loadProducts();
-            } catch (e) { console.error(e); alert("Gagal: " + e.message); }
-        };
-
-        function closeReceivingModal() { document.getElementById('receivingModal').classList.add('hidden'); }
-
-        // --- REQUISITION LOGIC ---
-        function showRequisitionModal() { reqItems = []; document.getElementById('reqItemsList').innerHTML = ''; document.getElementById('requisitionModal').classList.remove('hidden'); }
-        function closeRequisitionModal() { document.getElementById('requisitionModal').classList.add('hidden'); }
-        function addReqItem() { const name = document.getElementById('reqName').value; const qty = document.getElementById('reqQty').value; if(name && qty) { reqItems.push({name, qty}); document.getElementById('reqItemsList').innerHTML = reqItems.map(i => `<div>• ${i.name} (${i.qty})</div>`).join(''); document.getElementById('reqName').value = ''; document.getElementById('reqQty').value = ''; } }
-        async function submitRequisition(e) {
-            e.preventDefault(); if(reqItems.length === 0) return alert("Masukkan minimal 1 barang");
-            try { await window.addDoc(window.collection(window.db, "requisitions"), { branch: currentArea, priority: document.getElementById('reqPriority').value, items: JSON.stringify(reqItems), status: 'pending', createdAt: new Date().toISOString() }); alert("Permintaan terkirim!"); closeRequisitionModal(); } catch(e) { console.error(e); alert("Gagal mengirim request"); }
+            if(totalEl) totalEl.textContent = formatRp(total);
+            if(cartCountEl) cartCountEl.textContent = `${count} item`;
+            if(btn) btn.disabled = cart.length === 0 || !selectedPaymentMethod;
         }
 
-        // ... [Standard Functions] ...
+        function modQty(idx, change) {
+            cart[idx].quantity += change;
+            if(cart[idx].quantity <= 0) cart.splice(idx, 1);
+            updateCartDisplay();
+        }
+
+        async function executeTransaction(extraData = {}) {
+            if (!activeShift) return alert("ERROR: Shift belum dibuka!");
+            try {
+                const data = {
+                    area: currentArea,
+                    shiftId: activeShift.id,
+                    items: cart.map(i => `${i.name} x${i.quantity}`).join(', '),
+                    total: cart.reduce((s, i) => s + (i.price * i.quantity), 0),
+                    method: selectedPaymentMethod,
+                    cart: cart,
+                    ...extraData,
+                    timestamp: new Date().toISOString()
+                };
+
+                await window.addDoc(window.collection(window.db, "sales"), data);
+                const stockKey = `Stok Area Kasir ${currentArea}`;
+                for (const item of cart) { 
+                    const productRef = window.doc(window.db, "products", item.docId); 
+                    await window.updateDoc(productRef, { [stockKey]: window.increment(-item.quantity) }); 
+                }
+                fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({action: 'record_sale', data: data}) }).catch(console.error);
+                
+                lastTransaction = data;
+                showReceipt();
+                resetTransaction(); // Now correctly defined
+                showToast("Transaksi Berhasil!");
+                loadProducts();
+            } catch (e) { console.error(e); showToast("Gagal transaksi", true); }
+        }
+
         async function loadProducts() {
             try {
                 const q = window.query(window.collection(window.db, "products"));
@@ -357,103 +526,50 @@
             reportSelect.innerHTML = '<option value="">Pilih Produk...</option>';
             availableProducts.forEach(p => { const opt = document.createElement('option'); opt.value = p.Barcode; opt.textContent = `${p['Nama Produk']} - Rp ${p.Harga}`; select.appendChild(opt); reportSelect.appendChild(opt.cloneNode(true)); });
         }
-
-        function displayProducts(products = availableProducts) {
-            // MODIFICATION: Added stock display logic here
-            const stockKey = `Stok Area Kasir ${currentArea}`;
-            const grid = document.getElementById('productGrid');
-            grid.innerHTML = products.map(p => `
-                <div class="bg-white p-4 rounded-xl card-shadow product-card flex justify-between items-center">
-                    <div>
-                        <h4 class="font-bold text-gray-800">${p['Nama Produk']}</h4>
-                        <p class="text-sm text-gray-500">${p.Barcode}</p>
-                        <p class="text-adamart-600 font-bold mt-1">Rp ${p.Harga.toLocaleString('id-ID')}</p>
-                         <p class="text-xs text-gray-500 mt-1">Stok: <span class="font-bold text-gray-700">${p[stockKey] || 0}</span></p>
-                    </div>
-                    <button onclick="addToCart('${p.Barcode}')" class="bg-adamart-100 text-adamart-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-adamart-200">
-                        + Beli
-                    </button>
-                </div>
-            `).join('');
+        
+        function displayProducts(products = availableProducts) { 
+            const stockKey = `Stok Area Kasir ${currentArea}`; 
+            document.getElementById('productGrid').innerHTML = products.map(p => `<div class="bg-white p-3 rounded-lg shadow border hover:border-blue-500 transition cursor-pointer" onclick="addToCart('${String(p.Barcode).replace(/'/g, "\\'")}')"><div><h4 class="font-bold text-gray-800 text-sm truncate">${p['Nama Produk']}</h4><div class="flex justify-between items-center mt-2"><span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">${p.Barcode}</span><span class="text-xs font-bold text-gray-500">Stok: ${p[stockKey]}</span></div><p class="text-blue-600 font-bold mt-2 text-sm">Rp ${p.Harga.toLocaleString('id-ID')}</p></div></div>`).join(''); 
         }
-
+        
         function filterProducts() { const term = document.getElementById('productSearch').value.toLowerCase(); const filtered = availableProducts.filter(p => String(p['Nama Produk']).toLowerCase().includes(term) || String(p.Barcode).toLowerCase().includes(term)); displayProducts(filtered); }
         function selectProduct() { const val = document.getElementById('productSelect').value; if(val) { addToCart(val); document.getElementById('productSelect').value = ''; } }
         
-        function addToCart(barcode) {
-            const product = availableProducts.find(p => String(p.Barcode) == barcode);
-            if (!product) return showToast("Produk error", true);
-            const existing = cart.find(i => i.barcode == barcode);
-            if(existing) existing.quantity++; else cart.push({ barcode: product.Barcode, name: product['Nama Produk'], price: product.Harga, quantity: 1, docId: product.id });
-            updateCartDisplay(); showToast("Produk masuk keranjang");
-        }
-
-        function updateCartDisplay() {
-            const container = document.getElementById('cartItems');
-            if (cart.length === 0) { container.innerHTML = '<div class="text-center text-gray-400 py-4">Keranjang Kosong</div>'; document.getElementById('totalAmount').textContent = 'Rp 0'; document.getElementById('cartCount').textContent = '0 item'; document.getElementById('checkoutBtn').disabled = true; return; }
-            let total = 0, count = 0;
-            container.innerHTML = cart.map((item, idx) => { total += item.price * item.quantity; count += item.quantity; return `<div class="flex justify-between items-center bg-gray-50 p-2 rounded"><div class="flex-1"><div class="font-bold text-sm">${item.name}</div><div class="text-xs text-gray-500">Rp ${item.price} x ${item.quantity}</div></div><div class="flex gap-2 items-center"><button onclick="modQty(${idx}, -1)" class="w-6 h-6 bg-red-100 text-red-600 rounded">-</button><span class="font-bold text-sm">${item.quantity}</span><button onclick="modQty(${idx}, 1)" class="w-6 h-6 bg-green-100 text-green-600 rounded">+</button></div></div>`; }).join('');
-            document.getElementById('totalAmount').textContent = `Rp ${total.toLocaleString('id-ID')}`; document.getElementById('cartCount').textContent = `${count} item`; document.getElementById('checkoutBtn').disabled = !selectedPaymentMethod;
-        }
-
-        function modQty(idx, change) { cart[idx].quantity += change; if(cart[idx].quantity <= 0) cart.splice(idx, 1); updateCartDisplay(); }
-        function clearCart() { cart = []; updateCartDisplay(); }
-        function selectPaymentMethod(method) { selectedPaymentMethod = method; document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('bg-adamart-100', 'text-adamart-700', 'ring-2', 'ring-adamart-500')); document.getElementById('pay' + method).classList.add('bg-adamart-100', 'text-adamart-700', 'ring-2', 'ring-adamart-500'); updateCartDisplay(); }
+        function selectPaymentMethod(method) { selectedPaymentMethod = method; document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-700')); document.getElementById('pay' + method).classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700'); updateCartDisplay(); }
         function processTransaction() { if(selectedPaymentMethod === 'Kasbon') { document.getElementById('kasbonModal').classList.remove('hidden'); } else { executeTransaction(); } }
-        function closeKasbonModal() { document.getElementById('kasbonModal').classList.add('hidden'); }
-        function processKasbonTransaction(e) { e.preventDefault(); const n = document.getElementById('employeeName').value; const m = document.getElementById('memberNumber').value; const p = document.getElementById('minePermit').value; closeKasbonModal(); executeTransaction({memberNumber: n + (m ? ` (${m})` : ''), minePermit: p}); }
+        function processKasbonTransaction(e) { e.preventDefault(); const n = document.getElementById('employeeName').value; const m = document.getElementById('memberNumber').value; const p = document.getElementById('minePermit').value; document.getElementById('kasbonModal').classList.add('hidden'); executeTransaction({memberNumber: n + (m ? ` (${m})` : ''), minePermit: p}); }
+        async function submitReport(e) { e.preventDefault(); const barcode = document.getElementById('reportProductSelect').value; const product = availableProducts.find(p => String(p.Barcode) == barcode); if(!product) return; const data = { barcode: barcode, name: product['Nama Produk'], quantity: parseInt(document.getElementById('reportQuantity').value), reason: document.getElementById('reportReason').value, area: currentArea, notes: document.getElementById('reportNotes').value, timestamp: new Date().toISOString() }; try { await window.addDoc(window.collection(window.db, "reports"), data); const stockKey = `Stok Area Kasir ${currentArea}`; const productRef = window.doc(window.db, "products", product.id); await window.updateDoc(productRef, { [stockKey]: window.increment(-data.quantity) }); fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({action: 'report_item', data: data}) }); showToast("Laporan Terkirim"); document.getElementById('reportForm').reset(); showTransactionPage(); loadProducts(); } catch(e) { showToast("Gagal lapor", true); } }
+        
+        // Modal Functions
+        function showReceivingModal() { document.getElementById('receivingModal').classList.remove('hidden'); backToPOList(); const poList = document.getElementById('poList'); poList.innerHTML = '<p class="text-center text-gray-500 py-10">Mencari PO...</p>'; const branchMap = { "adamart 73": "Adamart 73", "adamart induksi": "Adamart Induksi", "adamart kelanis": "Adamart Kelanis" }; const queryBranch = branchMap[currentArea] || currentArea; window.getDocs(window.query(window.collection(window.db, "purchases"), window.where("status", "==", "pending"), window.where("branch", "==", queryBranch))).then(snap => { if(snap.empty) { poList.innerHTML = '<p class="text-center text-gray-500 py-10">Tidak ada barang masuk.</p>'; return; } let html = ''; snap.forEach(doc => { const po = doc.data(); const items = JSON.parse(po.items); const poDataStr = encodeURIComponent(JSON.stringify({ id: doc.id, ...po })); html += `<div class="border p-4 rounded-lg bg-gray-50 mb-2"><div class="flex justify-between font-bold mb-2"><span class="text-blue-800">${po.batchNumber}</span><span class="text-xs text-gray-500">${new Date(po.createdAt).toLocaleDateString()}</span></div><div class="text-xs text-gray-600 mb-3">${items.length} Jenis Barang</div><button onclick="openVerification('${poDataStr}')" class="w-full bg-blue-600 text-white py-2 rounded font-bold text-sm">Proses</button></div>`; }); poList.innerHTML = html; }); }
+        window.openVerification = (poStr) => { currentReceivingPO = JSON.parse(decodeURIComponent(poStr)); const items = JSON.parse(currentReceivingPO.items); document.getElementById('poList').classList.add('hidden'); document.getElementById('poVerification').classList.remove('hidden'); document.getElementById('verifyBatchNum').textContent = currentReceivingPO.batchNumber; document.getElementById('verificationItems').innerHTML = items.map((item, idx) => `<div class="bg-white border p-3 rounded-lg shadow-sm mb-2"><div class="font-bold text-gray-800">${item.name}</div><div class="text-xs text-gray-500 mb-2">${item.barcode}</div><div class="grid grid-cols-2 gap-3"><input type="number" id="rec-qty-${idx}" value="${item.qty}" class="w-full p-2 border rounded text-center font-bold"><input type="date" id="rec-exp-${idx}" class="w-full p-2 border rounded text-sm"></div><label class="flex items-center gap-2 text-sm mt-2"><input type="checkbox" id="rec-check-${idx}" checked> Kondisi Baik</label></div>`).join(''); };
+        window.backToPOList = () => { document.getElementById('poVerification').classList.add('hidden'); document.getElementById('poList').classList.remove('hidden'); };
+        window.submitVerification = async () => { if(!currentReceivingPO) return; const items = JSON.parse(currentReceivingPO.items); const stockKey = `Stok Area Kasir ${currentArea}`; try { for(let i=0; i<items.length; i++) { const item = items[i]; const qty = parseInt(document.getElementById(`rec-qty-${i}`).value); const exp = document.getElementById(`rec-exp-${i}`).value; if(qty>0) { let q = window.query(window.collection(window.db, "products"), window.where("Barcode", "==", item.barcode)); let snap = await window.getDocs(q); if(!snap.empty) { await window.updateDoc(snap.docs[0].ref, { [stockKey]: window.increment(qty), "Tanggal Kadaluarsa": new Date(exp).toISOString() }); } else { await window.addDoc(window.collection(window.db, "products"), { Barcode: item.barcode, "Nama Produk": item.name, Harga: parseInt(item.price), [stockKey]: qty, "Tanggal Kadaluarsa": new Date(exp).toISOString() }); } fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'update_stock', data: { barcode: item.barcode, name: item.name, price: item.price, area: currentArea, quantity: qty, expiryDate: exp } }) }); } } await window.updateDoc(window.doc(window.db, "purchases", currentReceivingPO.id), { status: 'completed', receivedAt: new Date().toISOString() }); alert("Stok Updated!"); document.getElementById('receivingModal').classList.add('hidden'); loadProducts(); } catch(e) { alert(e.message); } };
+        function showRequisitionModal() { reqItems = []; document.getElementById('reqItemsList').innerHTML = ''; document.getElementById('requisitionModal').classList.remove('hidden'); }
+        function closeRequisitionModal() { document.getElementById('requisitionModal').classList.add('hidden'); }
+        window.addReqItem = () => { const name = document.getElementById('reqName').value; const qty = document.getElementById('reqQty').value; if(name && qty) { reqItems.push({name, qty}); document.getElementById('reqItemsList').innerHTML = reqItems.map(i => `<div>• ${i.name} (${i.qty})</div>`).join(''); document.getElementById('reqName').value = ''; document.getElementById('reqQty').value = ''; } };
+        window.submitRequisition = async (e) => { e.preventDefault(); if(reqItems.length===0) return; try { await window.addDoc(window.collection(window.db, "requisitions"), { branch: currentArea, priority: document.getElementById('reqPriority').value, items: JSON.stringify(reqItems), status: 'pending', createdAt: new Date().toISOString() }); alert("Terkirim!"); closeRequisitionModal(); } catch(e) { alert("Error"); } };
 
-        async function executeTransaction(extraData = {}) {
-            try {
-                const data = { area: currentArea, items: cart.map(i => `${i.name} x${i.quantity}`).join(', '), total: cart.reduce((s, i) => s + (i.price * i.quantity), 0), method: selectedPaymentMethod, cart: cart, ...extraData, timestamp: new Date().toISOString() };
-                await window.addDoc(window.collection(window.db, "sales"), data);
-                const stockKey = `Stok Area Kasir ${currentArea}`;
-                for (const item of cart) { const productRef = window.doc(window.db, "products", item.docId); await window.updateDoc(productRef, { [stockKey]: window.increment(-item.quantity) }); }
-                fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({action: 'record_sale', data: data}) }).catch(err => console.log("Sheet backup failed"));
-                lastTransaction = data; showReceipt(); resetTransaction(); showToast("Transaksi Berhasil!"); loadProducts();
-            } catch (e) { console.error(e); showToast("Gagal memproses transaksi", true); }
-        }
-
-        async function submitReport(e) {
-            e.preventDefault();
-            const barcode = document.getElementById('reportProductSelect').value;
-            const product = availableProducts.find(p => String(p.Barcode) == barcode);
-            if(!product) return;
-            const data = { barcode: barcode, name: product['Nama Produk'], quantity: parseInt(document.getElementById('reportQuantity').value), reason: document.getElementById('reportReason').value, area: currentArea, notes: document.getElementById('reportNotes').value, timestamp: new Date().toISOString() };
-            try {
-                await window.addDoc(window.collection(window.db, "reports"), data);
-                const stockKey = `Stok Area Kasir ${currentArea}`;
-                const productRef = window.doc(window.db, "products", product.id);
-                await window.updateDoc(productRef, { [stockKey]: window.increment(-data.quantity) });
-                fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({action: 'report_item', data: data}) });
-                showToast("Laporan Terkirim"); document.getElementById('reportForm').reset(); showTransactionPage(); loadProducts();
-            } catch(e) { showToast("Gagal lapor", true); }
-        }
-
-        function showReceipt() {
-            const t = lastTransaction;
-            let html = `<div class="text-center mb-4 font-bold text-lg">ADAMART</div><div class="text-xs text-gray-500 text-center mb-4">${new Date().toLocaleString()} | ${t.area}</div><div class="border-y border-dashed py-2 mb-2 space-y-2">`;
-            t.cart.forEach(i => { html += `<div><div>${i.name}</div><div class="flex justify-between text-gray-500"><span>${i.quantity} x ${i.price.toLocaleString()}</span><span>${(i.quantity * i.price).toLocaleString()}</span></div></div>`; });
-            html += `</div><div class="flex justify-between font-bold text-lg"><span>TOTAL</span><span>Rp ${t.total.toLocaleString()}</span></div><div class="flex justify-between text-sm mt-1"><span>Bayar</span><span>${t.method}</span></div>`;
-            if(t.memberNumber) html += `<div class="mt-3 pt-2 border-t border-dashed text-xs"><div class="font-bold">KASBON INFO</div><div>Nama: ${t.memberNumber}</div><div>MP: ${t.minePermit}</div></div>`;
-            document.getElementById('receiptContent').innerHTML = html; document.getElementById('receiptModal').classList.remove('hidden');
-        }
-
-        function sendToWhatsApp() {
-            const t = lastTransaction;
-            let text = `*ADAMART POS*\nArea: ${t.area}\nDate: ${new Date().toLocaleString()}\n----------------\n`;
-            t.cart.forEach(i => { text += `${i.name}\n${i.quantity} x ${i.price} = ${(i.quantity*i.price)}\n`; });
-            text += `----------------\n*TOTAL: Rp ${t.total.toLocaleString()}*\nMetode: ${t.method}`;
-            if(t.memberNumber) text += `\n(KASBON) Nama:${t.memberNumber} MP:${t.minePermit}`;
-            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-        }
-
-        function resetTransaction() { cart = []; selectedPaymentMethod = ''; document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('bg-adamart-100', 'text-adamart-700', 'ring-2')); updateCartDisplay(); }
-        function showToast(msg, isError = false) { const t = document.getElementById('toast'); t.textContent = msg; t.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-xl z-50 animate-bounce ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 3000); }
-        function showTransactionPage() { document.getElementById('reportPage').classList.add('hidden'); document.getElementById('transactionPage').classList.remove('hidden'); }
-        function showReportPage() { document.getElementById('transactionPage').classList.add('hidden'); document.getElementById('reportPage').classList.remove('hidden'); }
-        function closeReceiptModal() { document.getElementById('receiptModal').classList.add('hidden'); }
-        function changeArea() { location.reload(); }
+        // Expose functions to window
+        window.addToCart = addToCart;
+        window.modQty = modQty;
+        window.clearCart = clearCart;
+        window.selectPaymentMethod = selectPaymentMethod;
+        window.processTransaction = processTransaction;
+        window.showRequisitionModal = showRequisitionModal;
+        window.showReceivingModal = showReceivingModal;
+        window.showReportPage = showReportPage;
+        window.closeShiftModal = closeShiftModal;
+        window.startShift = startShift;
+        window.finishShift = finishShift;
+        window.closeKasbonModal = closeKasbonModal;
+        window.closeReceiptModal = closeReceiptModal;
+        window.closeRequisitionModal = closeRequisitionModal;
+        window.closeReceivingModal = closeReceivingModal;
+        window.closeReportPage = closeReportPage;
+        window.sendToWhatsApp = sendToWhatsApp;
+        window.selectArea = selectArea;
+        window.changeArea = changeArea;
     </script>
 </body>
 </html>
