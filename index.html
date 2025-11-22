@@ -113,6 +113,7 @@
         </div>
     </div>
 
+    <!-- MODALS -->
     <div id="kasbonModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl p-6 w-full max-w-md">
             <h3 class="font-bold text-lg mb-4">Data Kasbon</h3>
@@ -124,10 +125,34 @@
         </div>
     </div>
 
+    <!-- RECEIVING MODAL (IMPROVED) -->
     <div id="receivingModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl p-6 w-full max-w-2xl h-3/4 flex flex-col">
-            <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg">📦 Penerimaan Barang (PO)</h3><button onclick="closeReceivingModal()" class="text-gray-500">✕</button></div>
-            <div id="poList" class="flex-1 overflow-y-auto space-y-3"><p class="text-center text-gray-500 py-10">Memuat PO...</p></div>
+        <div class="bg-white rounded-xl p-6 w-full max-w-2xl h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">📦 Penerimaan Barang (PO)</h3>
+                <button onclick="closeReceivingModal()" class="text-gray-500">✕</button>
+            </div>
+            
+            <!-- LIST PO VIEW -->
+            <div id="poList" class="flex-1 overflow-y-auto space-y-3">
+                <p class="text-center text-gray-500 py-10">Memuat PO...</p>
+            </div>
+
+            <!-- DETAIL VERIFICATION VIEW -->
+            <div id="poVerification" class="hidden flex-1 flex flex-col overflow-hidden">
+                <div class="bg-blue-50 p-3 rounded-lg mb-4 text-sm border border-blue-200">
+                    <p><strong>PO Batch:</strong> <span id="verifyBatchNum">-</span></p>
+                    <p class="text-xs text-gray-600">Silakan cek fisik barang dan input tanggal kadaluarsa.</p>
+                </div>
+                <div id="verificationItems" class="flex-1 overflow-y-auto space-y-3 pr-2">
+                    <!-- Items injected here -->
+                </div>
+                <div class="border-t mt-4 pt-4 flex gap-3">
+                    <button onclick="backToPOList()" class="px-4 py-2 bg-gray-200 rounded-lg font-bold">Kembali</button>
+                    <button onclick="submitVerification()" class="flex-1 py-2 bg-green-600 text-white rounded-lg font-bold shadow hover:bg-green-700">✅ Simpan & Update Stok</button>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -156,6 +181,7 @@
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwkZVsoGXdgxck4xwOXk2fW4Oawn6diXu2bUX0sAIRFCfGeS1jTr6QjEH6Fr6-RFbnDAw/exec';
         let currentArea = '', availableProducts = [], cart = [], selectedPaymentMethod = '', lastTransaction = null;
         let reqItems = [];
+        let currentReceivingPO = null; // Stores active PO data for verification
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('productSearch').addEventListener('input', filterProducts);
@@ -171,7 +197,159 @@
             const checkDb = setInterval(async () => { if (window.db) { clearInterval(checkDb); await loadProducts(); document.getElementById('loadingScreen').classList.add('hidden'); document.getElementById('cashierInterface').classList.remove('hidden'); document.getElementById('currentArea').textContent = `Area: ${area}`; } }, 100);
         }
 
-        // --- REQUISITION LOGIC ---
+        // --- RECEIVING LOGIC WITH QC & EXPIRY ---
+        async function showReceivingModal() {
+            document.getElementById('receivingModal').classList.remove('hidden');
+            backToPOList(); // Reset view
+            const poList = document.getElementById('poList');
+            poList.innerHTML = '<p class="text-center text-gray-500 py-10">Mencari PO...</p>';
+            
+            const branchMap = { "adamart 73": "Adamart 73", "adamart induksi": "Adamart Induksi", "adamart kelanis": "Adamart Kelanis" };
+            const queryBranch = branchMap[currentArea] || currentArea;
+
+            try {
+                const q = window.query(window.collection(window.db, "purchases"), window.where("status", "==", "pending"), window.where("branch", "==", queryBranch));
+                const querySnapshot = await window.getDocs(q);
+                if(querySnapshot.empty) { poList.innerHTML = '<p class="text-center text-gray-500 py-10">Tidak ada barang masuk.</p>'; return; }
+                
+                let html = '';
+                querySnapshot.forEach((doc) => {
+                    const po = doc.data();
+                    const items = JSON.parse(po.items);
+                    // Encode PO data for passing to function
+                    const poDataStr = encodeURIComponent(JSON.stringify({ id: doc.id, ...po }));
+                    
+                    html += `
+                        <div class="border p-4 rounded-lg bg-gray-50 mb-2 hover:border-blue-400 transition">
+                            <div class="flex justify-between font-bold mb-2">
+                                <span class="text-blue-800">${po.batchNumber}</span>
+                                <span class="text-xs text-gray-500">${new Date(po.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <div class="text-xs text-gray-600 mb-3">${items.length} Jenis Barang</div>
+                            <button onclick="openVerification('${poDataStr}')" class="w-full bg-blue-600 text-white py-2 rounded font-bold text-sm">Proses & Cek Barang</button>
+                        </div>`;
+                });
+                poList.innerHTML = html;
+            } catch (e) { console.error(e); poList.innerHTML = '<p class="text-center text-red-500">Gagal memuat data.</p>'; }
+        }
+
+        window.openVerification = (poStr) => {
+            currentReceivingPO = JSON.parse(decodeURIComponent(poStr));
+            const items = JSON.parse(currentReceivingPO.items);
+            
+            document.getElementById('poList').classList.add('hidden');
+            document.getElementById('poVerification').classList.remove('hidden');
+            document.getElementById('verifyBatchNum').textContent = currentReceivingPO.batchNumber;
+            
+            const container = document.getElementById('verificationItems');
+            container.innerHTML = items.map((item, idx) => `
+                <div class="bg-white border p-3 rounded-lg shadow-sm">
+                    <div class="font-bold text-gray-800 mb-1">${item.name}</div>
+                    <div class="text-xs text-gray-500 mb-2">Barcode: ${item.barcode || '-'}</div>
+                    
+                    <div class="grid grid-cols-2 gap-3 mb-2">
+                        <div>
+                            <label class="text-xs font-bold text-gray-600 block mb-1">Jml Diterima</label>
+                            <input type="number" id="rec-qty-${idx}" value="${item.qty}" class="w-full p-2 border rounded text-center font-bold bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600 block mb-1">Tgl Kadaluarsa</label>
+                            <input type="date" id="rec-exp-${idx}" class="w-full p-2 border rounded text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    
+                    <label class="flex items-center gap-2 text-sm cursor-pointer bg-green-50 p-2 rounded border border-green-100">
+                        <input type="checkbox" id="rec-check-${idx}" class="w-4 h-4 text-green-600 rounded focus:ring-green-500" checked>
+                        <span class="text-green-800 font-medium">Kondisi Baik</span>
+                    </label>
+                </div>
+            `).join('');
+        };
+
+        window.backToPOList = () => {
+            document.getElementById('poVerification').classList.add('hidden');
+            document.getElementById('poList').classList.remove('hidden');
+            currentReceivingPO = null;
+        };
+
+        window.submitVerification = async () => {
+            if(!currentReceivingPO) return;
+            if(!confirm("Pastikan semua data benar. Stok akan ditambahkan. Lanjutkan?")) return;
+
+            const items = JSON.parse(currentReceivingPO.items);
+            const stockKey = `Stok Area Kasir ${currentArea}`;
+            
+            // Validate Inputs
+            for(let i=0; i<items.length; i++) {
+                const exp = document.getElementById(`rec-exp-${i}`).value;
+                if(!exp) return alert(`Harap isi tanggal kadaluarsa untuk ${items[i].name}`);
+            }
+
+            try {
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    const actualQty = parseInt(document.getElementById(`rec-qty-${i}`).value);
+                    const expiryDate = document.getElementById(`rec-exp-${i}`).value;
+                    const isGood = document.getElementById(`rec-check-${i}`).checked;
+
+                    if(actualQty > 0 && isGood) {
+                        // Update Firestore
+                        let q = window.query(window.collection(window.db, "products"), window.where("Barcode", "==", item.barcode));
+                        let snapshot = await window.getDocs(q);
+                        
+                        if (!snapshot.empty) {
+                            const productDoc = snapshot.docs[0];
+                            await window.updateDoc(productDoc.ref, { 
+                                [stockKey]: window.increment(actualQty),
+                                "Tanggal Kadaluarsa": new Date(expiryDate).toISOString() // Update latest expiry
+                            });
+                        } else {
+                            await window.addDoc(window.collection(window.db, "products"), {
+                                Barcode: item.barcode,
+                                "Nama Produk": item.name,
+                                Harga: parseInt(item.price),
+                                [stockKey]: actualQty,
+                                "Tanggal Kadaluarsa": new Date(expiryDate).toISOString()
+                            });
+                        }
+
+                        // Backup to Sheet
+                        fetch(APPS_SCRIPT_URL, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'update_stock', 
+                                data: { 
+                                    barcode: item.barcode, 
+                                    name: item.name, 
+                                    price: item.price, 
+                                    area: currentArea, 
+                                    quantity: actualQty,
+                                    expiryDate: expiryDate
+                                }
+                            })
+                        });
+                    }
+                }
+
+                // Mark PO as Completed
+                await window.updateDoc(window.doc(window.db, "purchases", currentReceivingPO.id), { 
+                    status: 'completed', 
+                    receivedAt: new Date().toISOString(),
+                    receivedBy: "Cashier" // Could implement cashier name login later
+                });
+                
+                alert("Stok berhasil diupdate!");
+                closeReceivingModal();
+                loadProducts();
+            } catch (e) {
+                console.error(e);
+                alert("Gagal: " + e.message);
+            }
+        };
+
+        function closeReceivingModal() { document.getElementById('receivingModal').classList.add('hidden'); }
+
+        // --- REQUISITION & OTHER LOGIC (UNCHANGED) ---
         function showRequisitionModal() { reqItems = []; document.getElementById('reqItemsList').innerHTML = ''; document.getElementById('requisitionModal').classList.remove('hidden'); }
         function closeRequisitionModal() { document.getElementById('requisitionModal').classList.add('hidden'); }
         function addReqItem() { const name = document.getElementById('reqName').value; const qty = document.getElementById('reqQty').value; if(name && qty) { reqItems.push({name, qty}); document.getElementById('reqItemsList').innerHTML = reqItems.map(i => `<div>• ${i.name} (${i.qty})</div>`).join(''); document.getElementById('reqName').value = ''; document.getElementById('reqQty').value = ''; } }
@@ -180,79 +358,7 @@
             try { await window.addDoc(window.collection(window.db, "requisitions"), { branch: currentArea, priority: document.getElementById('reqPriority').value, items: JSON.stringify(reqItems), status: 'pending', createdAt: new Date().toISOString() }); alert("Permintaan terkirim!"); closeRequisitionModal(); } catch(e) { console.error(e); alert("Gagal mengirim request"); }
         }
 
-        // --- RECEIVING LOGIC (UPDATED) ---
-        async function showReceivingModal() {
-            document.getElementById('receivingModal').classList.remove('hidden');
-            const poList = document.getElementById('poList');
-            poList.innerHTML = '<p class="text-center text-gray-500 py-10">Mencari PO...</p>';
-            try {
-                const q = window.query(window.collection(window.db, "purchases"), window.where("status", "==", "pending"), window.where("branch", "==", currentArea));
-                const querySnapshot = await window.getDocs(q);
-                if(querySnapshot.empty) { poList.innerHTML = '<p class="text-center text-gray-500 py-10">Tidak ada barang masuk.</p>'; return; }
-                let html = '';
-                querySnapshot.forEach((doc) => {
-                    const po = doc.data();
-                    const items = JSON.parse(po.items);
-                    // Simpan items dalam atribut data untuk akses mudah saat confirm
-                    const itemsStr = encodeURIComponent(JSON.stringify(items));
-                    html += `<div class="border p-4 rounded-lg bg-gray-50 mb-2"><div class="flex justify-between font-bold mb-2"><span>PO: ${po.batchNumber}</span><span class="text-sm text-gray-500">${new Date(po.createdAt).toLocaleDateString()}</span></div><div class="text-sm mb-3">${items.map(i => `<div>• ${i.name} (${i.qty})</div>`).join('')}</div><button onclick="confirmReceiving('${doc.id}', '${po.batchNumber}', '${itemsStr}')" class="w-full bg-green-600 text-white py-2 rounded font-bold">Terima Barang</button></div>`;
-                });
-                poList.innerHTML = html;
-            } catch (e) { poList.innerHTML = '<p class="text-center text-red-500">Gagal memuat data.</p>'; }
-        }
-
-        function closeReceivingModal() { document.getElementById('receivingModal').classList.add('hidden'); }
-
-        async function confirmReceiving(poId, batchNum, itemsStr) {
-            if(!confirm(`Terima barang dari PO ${batchNum}?`)) return;
-            const items = JSON.parse(decodeURIComponent(itemsStr));
-            const stockKey = `Stok Area Kasir ${currentArea}`;
-            
-            try {
-                // 1. Update Stok (Iterasi Item)
-                for (const item of items) {
-                    // Cari produk berdasarkan Barcode
-                    let q = window.query(window.collection(window.db, "products"), window.where("Barcode", "==", item.barcode));
-                    let snapshot = await window.getDocs(q);
-                    
-                    if (!snapshot.empty) {
-                        // Produk Ada: Update Stok
-                        const productDoc = snapshot.docs[0];
-                        await window.updateDoc(productDoc.ref, { [stockKey]: window.increment(parseInt(item.qty)) });
-                    } else {
-                        // Produk Baru: Buat Dokumen Baru (Optional, atau skip/log error)
-                        // Di sini kita buat baru dengan data minimal dari PO
-                        await window.addDoc(window.collection(window.db, "products"), {
-                            Barcode: item.barcode,
-                            "Nama Produk": item.name,
-                            Harga: parseInt(item.price),
-                            [stockKey]: parseInt(item.qty)
-                        });
-                    }
-                    
-                    // Backup ke Sheet (Penting untuk stok central)
-                    fetch(APPS_SCRIPT_URL, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'update_stock', 
-                            data: { barcode: item.barcode, name: item.name, price: item.price, area: currentArea, quantity: parseInt(item.qty) }
-                        })
-                    });
-                }
-
-                // 2. Update PO Status
-                await window.updateDoc(window.doc(window.db, "purchases", poId), { status: 'completed', receivedAt: new Date().toISOString() });
-                
-                alert("Stok berhasil ditambahkan!");
-                closeReceivingModal();
-                loadProducts(); // Refresh tampilan kasir
-            } catch (e) {
-                console.error(e);
-                alert("Gagal memproses: " + e.message);
-            }
-        }
-
-        // ... [Standard Functions] ...
+        // ... [Standard Functions: loadProducts, addToCart, etc.] ...
         async function loadProducts() {
             try {
                 const q = window.query(window.collection(window.db, "products"));
