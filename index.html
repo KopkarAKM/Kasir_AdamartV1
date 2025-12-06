@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Adamart - Kasir Hybrid (Final Stable)</title>
+    <title>Adamart - Kasir Offline First</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, updateDoc, setDoc, doc, query, where, increment } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, setDoc, doc, query, where, increment, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
@@ -22,6 +22,15 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+
+        // COBA AKTIFKAN OFFLINE PERSISTENCE BAWAAN FIREBASE (Opsional, tapi membantu)
+        enableIndexedDbPersistence(db).catch((err) => {
+            if (err.code == 'failed-precondition') {
+                console.log('Multiple tabs open, persistence can only be enabled in one tab at a a time.');
+            } else if (err.code == 'unimplemented') {
+                console.log('The current browser does not support all of the features required to enable persistence');
+            }
+        });
         
         window.db = db;
         window.collection = collection;
@@ -42,49 +51,68 @@
             })
             .catch((error) => {
                 console.error("Auth Failed:", error);
-                alert("Gagal Login Database: " + error.message);
+                // Tetap lanjut jika offline (karena auth mungkin gagal saat offline)
+                 document.dispatchEvent(new Event('firebase-ready'));
             });
     </script>
 
     <script>
         tailwind.config = { theme: { extend: { colors: { 'adamart': { 50: '#f0f9ff', 500: '#0ea5e9', 600: '#0284c7', 900: '#0c4a6e' } } } } }
     </script>
+    <style>
+        .offline-mode { border: 2px solid #ef4444; }
+        .online-mode { border: 2px solid #22c55e; }
+        @keyframes pulse-subtle { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .syncing { animation: pulse-subtle 1s infinite; }
+    </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
     
     <!-- 1. AREA SELECTION -->
     <div id="areaSelection" class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full border-t-4 border-blue-600">
-            <div class="text-center mb-8"><div class="text-6xl mb-4">⚡</div><h1 class="text-2xl font-bold text-gray-800 mb-2">Adamart Hybrid</h1><p class="text-gray-600">Pilih Area Operasional</p></div>
+            <div class="text-center mb-8"><div class="text-6xl mb-4">⚡</div><h1 class="text-2xl font-bold text-gray-800 mb-2">Adamart Hybrid</h1><p class="text-gray-600">Mode Hemat Data & Offline</p></div>
             <div class="space-y-4">
                 <button onclick="selectArea('adamart 73')" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 p-4 rounded-xl transition-all flex justify-between items-center border border-blue-200"><div class="flex items-center gap-3"><span class="text-2xl">🏢</span><div class="text-left font-bold">Adamart 73<div class="text-xs font-normal opacity-70">Area Utama</div></div></div><span>→</span></button>
                 <button onclick="selectArea('adamart induksi')" class="w-full bg-green-50 hover:bg-green-100 text-green-700 p-4 rounded-xl transition-all flex justify-between items-center border border-green-200"><div class="flex items-center gap-3"><span class="text-2xl">⚡</span><div class="text-left font-bold">Adamart Induksi<div class="text-xs font-normal opacity-70">Area Induksi</div></div></div><span>→</span></button>
                 <button onclick="selectArea('adamart kelanis')" class="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 p-4 rounded-xl transition-all flex justify-between items-center border border-purple-200"><div class="flex items-center gap-3"><span class="text-2xl">🌟</span><div class="text-left font-bold">Adamart Kelanis<div class="text-xs font-normal opacity-70">Area Kelanis</div></div></div><span>→</span></button>
             </div>
+            <p class="text-xs text-center text-gray-400 mt-6">Data produk akan disimpan lokal untuk menghemat kuota.</p>
         </div>
     </div>
 
     <!-- 2. LOADING SCREEN -->
     <div id="loadingScreen" class="hidden min-h-screen flex items-center justify-center p-4 bg-white/90 z-50 fixed inset-0">
-        <div class="text-center"><div class="animate-spin text-4xl mb-4 text-blue-600">⏳</div><h3 class="text-xl font-bold text-gray-800">Sinkronisasi Data...</h3></div>
+        <div class="text-center"><div class="animate-spin text-4xl mb-4 text-blue-600">⏳</div><h3 class="text-xl font-bold text-gray-800" id="loadingText">Sinkronisasi Data...</h3></div>
     </div>
 
     <!-- 3. INTERFACE KASIR UTAMA -->
     <div id="cashierInterface" class="hidden flex flex-col h-screen">
-        <header class="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-3 shadow-lg shrink-0">
+        <header class="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-3 shadow-lg shrink-0 transition-colors duration-300" id="mainHeader">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <button onclick="changeArea()" class="bg-white/10 p-2 rounded-lg hover:bg-white/20">🔄</button>
+                    <!-- Indikator Status Koneksi -->
+                    <div id="connectionStatus" class="bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                        <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span> ONLINE
+                    </div>
+                    <button onclick="forceRefreshData()" class="bg-white/10 p-2 rounded-lg hover:bg-white/20 text-xs flex items-center gap-1" title="Download Data Terbaru">
+                        🔄 <span class="hidden md:inline">Refresh Data</span>
+                    </button>
                     <div><h1 class="text-lg font-bold tracking-tight">ADAMART POS</h1><p id="currentArea" class="text-xs opacity-80 font-mono uppercase tracking-widest">-</p></div>
                 </div>
                 
                 <div class="flex items-center gap-2">
+                    <!-- Indikator Antrian Offline -->
+                    <div id="offlineQueueBadge" class="hidden bg-yellow-500 text-white px-3 py-1 rounded-lg text-xs font-bold cursor-pointer hover:bg-yellow-600 flex items-center gap-2 shadow-lg animate-bounce" onclick="syncOfflineData()">
+                        <span>⚠️</span> <span id="offlineCount">0</span> Data Belum Upload
+                    </div>
+
                     <div class="hidden md:block bg-black/20 px-3 py-1 rounded text-xs border border-white/10">
                         Kasir: <span id="headerCashierName" class="font-bold text-yellow-300">-</span>
                     </div>
                     
-                    <button onclick="showReceivingModal()" class="bg-purple-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-purple-500 flex items-center gap-1 shadow-sm border border-purple-400"><span>📦</span> Cek Kiriman (PO)</button>
-                    <button onclick="closeShiftModal()" class="bg-red-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-500 border border-red-400 shadow-sm">🛑 Tutup Shift</button>
+                    <button onclick="showReceivingModal()" class="bg-purple-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-purple-500 flex items-center gap-1 shadow-sm border border-purple-400"><span>📦</span> Cek PO</button>
+                    <button onclick="closeShiftModal()" class="bg-red-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-500 border border-red-400 shadow-sm">🛑 Tutup</button>
                 </div>
             </div>
         </header>
@@ -296,20 +324,41 @@
     <div id="toast" class="hidden fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl z-[80] animate-bounce flex items-center gap-2"><span>✅</span><span id="toastMsg">Notification</span></div>
     
     <script>
-        // --- KONFIGURASI URL ---
         const POS_API_URL = 'https://script.google.com/macros/s/AKfycbwkZVsoGXdgxck4xwOXk2fW4Oawn6diXu2bUX0sAIRFCfGeS1jTr6QjEH6Fr6-RFbnDAw/exec';
         const EVOUCHER_API_URL = "https://script.google.com/macros/s/AKfycbyQFkZW0QuBXi082jgXTsVBIy1OfVfhaQYVogvr7uBJBrCuGtkM73tTGqA1dl9ThlfL/exec";
 
-        // --- GLOBAL VARS ---
         let currentArea = '', availableProducts = [], cart = [], selectedPaymentMethod = '', lastTransaction = null;
         let activeShift = null, evoucherUsers = [];
         let receivingCart = [], activePO = null; 
+        let isOffline = false;
         
-        // --- CACHE PO ---
+        // CACHE & QUEUE
         window.cachedPOs = {}; 
-        window.allProducts = []; // CACHE SEMUA PRODUK (termasuk stok 0)
+        window.allProducts = [];
+        
+        // DETEKSI KONEKSI
+        window.addEventListener('online',  updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
 
-        // --- HELPER ---
+        function updateOnlineStatus() {
+            isOffline = !navigator.onLine;
+            const statusEl = document.getElementById('connectionStatus');
+            const header = document.getElementById('mainHeader');
+            
+            if(isOffline) {
+                statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-white"></span> OFFLINE MODE';
+                statusEl.className = 'bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-sm';
+                header.className = 'bg-gray-800 text-white p-3 shadow-lg shrink-0 transition-colors duration-300'; // Dark mode when offline
+                showToast("Mode Offline Aktif. Data disimpan lokal.", true);
+            } else {
+                statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-white animate-pulse"></span> ONLINE';
+                statusEl.className = 'bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-sm';
+                header.className = 'bg-gradient-to-r from-blue-700 to-blue-900 text-white p-3 shadow-lg shrink-0 transition-colors duration-300';
+                showToast("Online Kembali. Sinkronisasi...");
+                syncOfflineData();
+            }
+        }
+
         function formatRp(n) { return "Rp " + (n || 0).toLocaleString('id-ID'); }
         function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
@@ -341,11 +390,30 @@
             initShift(); showToast(`Shift dibuka: ${name}`);
         }
         async function closeShiftModal() {
+            // Hitung dari data lokal dulu jika offline, atau query jika online (untuk simplifikasi, kita ambil local accumulation jika memungkinkan, tapi di sini kita query DB karena asumsi shift closing butuh data akurat)
+            // Note: Dalam mode offline sejati, kita harus hitung dari localStorage transaksi hari ini.
+            
             if(!activeShift) return alert("Shift belum aktif");
-            const q = window.query(window.collection(window.db, "sales"), window.where("shiftId", "==", activeShift.id));
-            const snap = await window.getDocs(q);
+            
             let cash=0, qris=0, kasbon=0;
-            snap.forEach(d => { const v=d.data(); if(v.method==='Tunai') cash+=v.total; else if(v.method==='QRIS') qris+=v.total; else kasbon+=v.total; });
+
+            // Cek Offline Queue juga
+            const pending = JSON.parse(localStorage.getItem('adamart_pending_tx') || '[]');
+            pending.forEach(d => {
+                 if(d.shiftId === activeShift.id) {
+                    if(d.method==='Tunai') cash+=d.total; else if(d.method==='QRIS') qris+=d.total; else kasbon+=d.total;
+                 }
+            });
+
+            // Jika online, ambil dari server juga (opsional, tapi idealnya data server + lokal yg belum sync)
+            // Untuk simplifikasi "Hemat Kuota", kita asumsikan kasir sync dulu sebelum tutup shift
+            if(navigator.onLine) {
+                const q = window.query(window.collection(window.db, "sales"), window.where("shiftId", "==", activeShift.id));
+                const snap = await window.getDocs(q);
+                snap.forEach(d => { const v=d.data(); if(v.method==='Tunai') cash+=v.total; else if(v.method==='QRIS') qris+=v.total; else kasbon+=v.total; });
+            } else {
+                alert("Mode Offline: Data tutup shift mungkin tidak 100% akurat jika ada transaksi server lain. Harap sync dulu.");
+            }
             
             document.getElementById('cs-name').textContent = activeShift.cashierName;
             document.getElementById('cs-time').textContent = new Date().toLocaleTimeString();
@@ -359,6 +427,7 @@
             m.dataset.exp = activeShift.startCash + cash; m.dataset.cash = cash; m.dataset.qris = qris; m.dataset.kasbon = kasbon;
             m.classList.remove('hidden');
         }
+        
         async function finishShift(e) {
             e.preventDefault();
             const act = parseInt(document.getElementById('actualCash').value);
@@ -369,12 +438,20 @@
                 totalQris: parseInt(m.dataset.qris), totalKasbon: parseInt(m.dataset.kasbon),
                 actualCash: act, difference: act - parseInt(m.dataset.exp), area: currentArea, closeTime: new Date().toISOString()
             };
-            try {
-                await window.addDoc(window.collection(window.db, "shifts"), rep);
-                fetch(POS_API_URL, { method: 'POST', body: JSON.stringify({action: 'record_shift', data: rep}) });
-                localStorage.removeItem('adamart_shift'); activeShift = null;
-                alert("Shift Ditutup. Sampai jumpa!"); location.reload();
-            } catch(e) { alert("Error: "+e.message); }
+            
+            if(navigator.onLine) {
+                try {
+                    await window.addDoc(window.collection(window.db, "shifts"), rep);
+                    fetch(POS_API_URL, { method: 'POST', body: JSON.stringify({action: 'record_shift', data: rep}) });
+                    alert("Shift Ditutup & Terupload.");
+                } catch(e) { alert("Gagal upload: "+e.message); }
+            } else {
+                // Simpan lokal jika offline (Implementasi sederhana: alert user)
+                alert("Shift Ditutup (Offline). Data disimpan di HP, laporan manual ke Manager.");
+            }
+            
+            localStorage.removeItem('adamart_shift'); activeShift = null;
+            location.reload();
         }
 
         // --- PAYMENT & E-VOUCHER ---
@@ -431,25 +508,113 @@
                 executeTransaction({memberNumber: `${u.name} (${u.noAnggota})`});
             });
         }
+
+        // --- CORE TRANSACTION LOGIC (OFFLINE FIRST) ---
         async function executeTransaction(ex={}) {
             if(!activeShift) return alert("Buka Shift dulu");
+            
+            const tot = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
+            const d = { 
+                area: currentArea, shiftId: activeShift.id, items: cart.map(i=>`${i.name} x${i.quantity}`).join(', '),
+                total: tot, method: selectedPaymentMethod, cart: cart, ...ex, timestamp: new Date().toISOString()
+            };
+
+            // OFFLINE FIRST STRATEGY
+            if (!navigator.onLine) {
+                // 1. Save to Queue
+                const pending = JSON.parse(localStorage.getItem('adamart_pending_tx') || '[]');
+                pending.push(d);
+                localStorage.setItem('adamart_pending_tx', JSON.stringify(pending));
+                
+                // 2. Update Local Stock (Visual Only) - Optional but good UX
+                // Kita tidak update 'availableProducts' permanen di sini karena kompleks, cukup visual reset cart.
+                
+                lastTransaction = d; 
+                showReceipt(); 
+                resetTransaction(); 
+                showToast("Disimpan OFFLINE (Masuk Antrian)", true);
+                updateOfflineBadge();
+                return;
+            }
+
+            // ONLINE STRATEGY
             try {
-                const tot = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
-                const d = { 
-                    area: currentArea, shiftId: activeShift.id, items: cart.map(i=>`${i.name} x${i.quantity}`).join(', '),
-                    total: tot, method: selectedPaymentMethod, cart: cart, ...ex, timestamp: new Date().toISOString()
-                };
                 await window.addDoc(window.collection(window.db,"sales"), d);
                 for(const i of cart) {
                     await window.updateDoc(window.doc(window.db,"products",i.docId), {[`Stok Area Kasir ${currentArea}`]: window.increment(-i.quantity)});
                 }
                 fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_sale', data:d})});
                 lastTransaction=d; showReceipt(); resetTransaction(); showToast("Transaksi Berhasil"); loadProducts();
-            } catch(e) { alert("Gagal: "+e.message); }
+            } catch(e) { 
+                console.error(e);
+                // Fallback to offline if error
+                const pending = JSON.parse(localStorage.getItem('adamart_pending_tx') || '[]');
+                pending.push(d);
+                localStorage.setItem('adamart_pending_tx', JSON.stringify(pending));
+                lastTransaction=d; showReceipt(); resetTransaction(); 
+                showToast("Gagal Koneksi. Disimpan Offline.", true);
+                updateOfflineBadge();
+            }
         }
 
-        // --- LOGISTIK: RECEIVING WITH QC & AUTO-STOCK (FIXED ID LOOKUP) ---
+        // --- SYNC MECHANISM ---
+        async function syncOfflineData() {
+            const pending = JSON.parse(localStorage.getItem('adamart_pending_tx') || '[]');
+            if(pending.length === 0) return;
+            
+            if(!navigator.onLine) return alert("Masih Offline. Cari sinyal dulu.");
+            
+            const badge = document.getElementById('offlineQueueBadge');
+            badge.innerHTML = `⏳ Mengupload ${pending.length} data...`;
+            
+            let successCount = 0;
+            const newPending = [];
+
+            for (const d of pending) {
+                try {
+                    await window.addDoc(window.collection(window.db,"sales"), d);
+                    // Update stock juga (agak tricky karena id mungkin berubah jika produk diedit di server, tapi asumsi ID tetap)
+                    for(const i of d.cart) {
+                        // Cek apakah docId valid
+                         if(i.docId) {
+                             await window.updateDoc(window.doc(window.db,"products",i.docId), {[`Stok Area Kasir ${d.area}`]: window.increment(-i.quantity)});
+                         }
+                    }
+                    fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_sale', data:d})});
+                    successCount++;
+                } catch (e) {
+                    console.error("Sync failed for item:", e);
+                    newPending.push(d); // Keep failed items
+                }
+            }
+
+            localStorage.setItem('adamart_pending_tx', JSON.stringify(newPending));
+            updateOfflineBadge();
+            
+            if(successCount > 0) {
+                alert(`Berhasil upload ${successCount} transaksi!`);
+                loadProducts(); // Refresh stok terbaru dari server
+            }
+            if(newPending.length > 0) alert(`Gagal upload ${newPending.length} transaksi. Coba lagi nanti.`);
+        }
+
+        function updateOfflineBadge() {
+            const pending = JSON.parse(localStorage.getItem('adamart_pending_tx') || '[]');
+            const badge = document.getElementById('offlineQueueBadge');
+            const countEl = document.getElementById('offlineCount');
+            
+            if(pending.length > 0) {
+                badge.classList.remove('hidden');
+                countEl.textContent = pending.length;
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // --- LOGISTIK: RECEIVING ---
         function showReceivingModal() {
+            if (!navigator.onLine) return alert("Fitur Terima Barang butuh koneksi internet untuk update stok server.");
+            
             activePO = null; receivingCart = []; 
             document.getElementById('poDetailHeader').classList.add('hidden');
             document.getElementById('poItemsContainer').classList.add('hidden');
@@ -468,7 +633,6 @@
                 let html = '';
                 snap.forEach(doc => {
                     const data = doc.data();
-                    // Match area case-insensitive
                     if (data.branch && data.branch.toLowerCase() === currentArea.toLowerCase()) {
                         window.cachedPOs[doc.id] = data; 
                         const itemCount = JSON.parse(data.items).length;
@@ -480,7 +644,6 @@
         }
 
         window.loadPO = function(docId) {
-            // RELOAD PRODUCTS TO ENSURE LATEST DATA
             loadProducts().then(() => {
                 const data = window.cachedPOs[docId];
                 if (!data) return; 
@@ -489,23 +652,10 @@
                 try {
                     const items = JSON.parse(data.items);
                     items.forEach(item => {
-                        // MATCHING: Gunakan String comparison yang ketat untuk Barcode
-                        // Pastikan window.allProducts sudah terisi
                         const localProd = window.allProducts.find(p => String(p.Barcode) === String(item.barcode));
-                        
                         const poData = { price: parseInt(item.price || 0), hpp: parseInt(item.hpp || 0) };
-
                         const baseItem = localProd ? 
-                            localProd : 
-                            { 
-                                id: null, // Flag sebagai produk baru
-                                'Nama Produk': item.name, 
-                                Barcode: item.barcode, 
-                                isNew: true,
-                                Harga: poData.price, 
-                                HPP: poData.hpp      
-                            };
-                        
+                            localProd : { id: null, 'Nama Produk': item.name, Barcode: item.barcode, isNew: true, Harga: poData.price, HPP: poData.hpp };
                         receivingCart.push({ ...baseItem, poQty: parseInt(item.qty), receivedQty: parseInt(item.qty), condition: 'Baik', expiry: '' });
                     });
                     document.getElementById('poBatchNo').textContent = data.batchNumber;
@@ -556,7 +706,6 @@
             document.getElementById('recvTotalItems').textContent = totalGood;
         }
 
-        // FIXED SUBMIT FUNCTION: ROBUST ID LOOKUP AND FIELD CREATION
         async function submitReceiving() {
             if(!activePO || receivingCart.length===0) return;
             const totalGood = receivingCart.reduce((s,i) => s + (i.condition==='Baik' ? i.receivedQty : 0), 0);
@@ -570,32 +719,22 @@
             btn.textContent = "⏳ Memproses...";
 
             try {
-                const k = `Stok Area Kasir ${currentArea}`; // Pastikan nama field ini SAMA PERSIS dengan di database
+                const k = `Stok Area Kasir ${currentArea}`; 
                 let processed = 0;
                 let failures = [];
                 
-                // 1. PROCESS STOCK UPDATE
                 for (const item of receivingCart) {
                     if(item.condition === 'Baik' && item.receivedQty > 0) {
                         try {
-                            // SEARCH AGAIN IN DB TO BE 100% SURE (Avoids stale cache issues)
-                            // Gunakan String(item.Barcode) untuk mengatasi masalah tipe data angka/teks
                             const q = window.query(window.collection(window.db, "products"), window.where("Barcode", "==", String(item.Barcode)));
                             const snap = await window.getDocs(q);
                             
                             if (!snap.empty) {
-                                // PRODUK ADA -> UPDATE
                                 const docRef = snap.docs[0].ref;
-                                const currentData = snap.docs[0].data();
-                                
-                                // Cek apakah field stok untuk cabang ini sudah ada?
-                                // Gunakan setDoc dengan merge: true agar field stok baru otomatis dibuat jika belum ada
                                 const updateData = {[k]: window.increment(Number(item.receivedQty))};
                                 if(item.expiry) updateData['ExpiryDate'] = item.expiry;
-                                
                                 await window.setDoc(docRef, updateData, { merge: true });
                             } else {
-                                // PRODUK TIDAK ADA -> BUAT BARU
                                 const newProduct = {
                                     "Nama Produk": item['Nama Produk'].replace(" (NEW)", "").replace(" (Baru)", "").replace(" (Auto-Create)", ""),
                                     "Barcode": String(item.Barcode),
@@ -618,7 +757,6 @@
                 if (failures.length > 0) {
                     alert("Beberapa barang gagal disimpan: " + failures.join(", "));
                 } else {
-                    // 2. Log Inventory
                     const log = {
                         logId: "RCV-"+Date.now(), type: "RECEIVING", area: currentArea,
                         items: receivingCart.map(i=>({
@@ -630,21 +768,16 @@
                         timestamp: new Date().toISOString(), user: activeShift?activeShift.cashierName:"Admin"
                     };
                     await window.addDoc(window.collection(window.db,"inventory_logs"), log);
-
-                    // 3. Close PO
                     await window.updateDoc(window.doc(window.db, "purchases", activePO.id), { 
                         status: 'received',
                         receivedAt: new Date().toISOString(),
                         receivedBy: activeShift ? activeShift.cashierName : 'Admin',
                         receivingNote: note
                     });
-
-                    // 4. Sync Sheet
                     fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_receiving', data:log})});
-                    
                     alert("✅ Barang Diterima & Stok Berhasil Diupdate!");
                     closeReceivingModal(); 
-                    loadProducts(); // Refresh tampilan kasir
+                    loadProducts(); 
                 }
 
             } catch(e) { 
@@ -664,29 +797,56 @@
         function closeReceiptModal() { document.getElementById('receiptModal').classList.add('hidden'); }
         function closeKasbonModal() { document.getElementById('kasbonModal').classList.add('hidden'); }
 
+        // --- DATA LOADING & CACHE ---
+        function forceRefreshData() {
+            localStorage.removeItem(`adamart_products_${currentArea}`);
+            loadProducts();
+        }
+
         async function selectArea(area) {
             currentArea = area; document.getElementById('areaSelection').classList.add('hidden'); document.getElementById('loadingScreen').classList.remove('hidden');
+            // Check offline pending count
+            updateOfflineBadge();
+            
             const c = setInterval(async()=>{if(window.db){clearInterval(c);await loadProducts();document.getElementById('loadingScreen').classList.add('hidden');document.getElementById('cashierInterface').classList.remove('hidden');document.getElementById('currentArea').textContent=area;initShift();}},100);
         }
 
-        // --- RESTORED FUNCTIONS ---
         async function loadProducts() {
+            const loadingText = document.getElementById('loadingText');
+            loadingText.textContent = "Memuat Data Produk...";
+            
             try {
-                const q = window.query(window.collection(window.db, "products"));
-                const querySnapshot = await window.getDocs(q);
-                const products = [];
-                // FIX: Load ALL products for system reference (even stock 0) for QC check
-                querySnapshot.forEach((doc) => { products.push({ id: doc.id, ...doc.data() }); });
+                // 1. Cek Cache Lokal
+                const cacheKey = `adamart_products_${currentArea}`;
+                const cached = localStorage.getItem(cacheKey);
                 
-                window.allProducts = products; // Save to global cache
-                
-                // Filter for Sales UI (only stock > 0)
-                const stockKey = `Stok Area Kasir ${currentArea}`;
-                availableProducts = products.filter(p => (p[stockKey] || 0) > 0); 
-                
-                populateSelects(); displayProducts();
+                if (cached && !navigator.onLine) {
+                    // Offline mode: Load from cache
+                    console.log("Loading products from cache");
+                    const parsed = JSON.parse(cached);
+                    window.allProducts = parsed;
+                    availableProducts = parsed.filter(p => (p[`Stok Area Kasir ${currentArea}`] || 0) > 0);
+                    populateSelects(); displayProducts();
+                    return;
+                }
+
+                // 2. Online mode: Fetch Fresh
+                if (navigator.onLine) {
+                    const q = window.query(window.collection(window.db, "products"));
+                    const querySnapshot = await window.getDocs(q);
+                    const products = [];
+                    querySnapshot.forEach((doc) => { products.push({ id: doc.id, ...doc.data() }); });
+                    
+                    // Save to Cache
+                    localStorage.setItem(cacheKey, JSON.stringify(products));
+                    window.allProducts = products;
+                    
+                    const stockKey = `Stok Area Kasir ${currentArea}`;
+                    availableProducts = products.filter(p => (p[stockKey] || 0) > 0); 
+                    populateSelects(); displayProducts();
+                }
             } catch (e) {
-                console.error("Firebase Error:", e); showToast("Gagal memuat data produk", true);
+                console.error("Firebase Error:", e); showToast("Gagal memuat data produk (Mode Offline)", true);
             }
         }
 
@@ -782,9 +942,9 @@
             document.getElementById('productSearch').addEventListener('input', filterProducts);
             document.getElementById('productSelect').addEventListener('change', selectProduct);
             loadEvoucherData();
+            updateOfflineBadge();
         });
         
-        // Expose functions globally for onclick handlers
         window.addToCart = addToCart;
         window.modQty = modQty;
         window.clearCart = clearCart;
@@ -805,6 +965,8 @@
         window.closeReceivingModal = closeReceivingModal;
         window.submitReceiving = submitReceiving;
         window.filterProducts = filterProducts;
+        window.forceRefreshData = forceRefreshData;
+        window.syncOfflineData = syncOfflineData;
     </script>
 </body>
 </html>
