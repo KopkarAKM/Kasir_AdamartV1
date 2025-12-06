@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Adamart - Kasir Hybrid (Final)</title>
+    <title>Adamart - Kasir Hybrid (Final Stable)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, query, where, increment } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, setDoc, doc, query, where, increment } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-        // Konfigurasi Firebase (JANGAN DIUBAH)
         const firebaseConfig = {
             apiKey: "AIzaSyBApyoL7sczxl1kDq_WgPtnYF4lyujuWgc",
             authDomain: "adamart-pos.firebaseapp.com",
@@ -20,102 +20,103 @@
         };
 
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const db = getFirestore(app);
         
-        // Expose ke window agar bisa dipanggil fungsi biasa
         window.db = db;
         window.collection = collection;
         window.getDocs = getDocs;
         window.addDoc = addDoc;
         window.updateDoc = updateDoc;
+        window.setDoc = setDoc;
         window.doc = doc;
         window.query = query;
         window.where = where;
         window.increment = increment;
         
-        document.dispatchEvent(new Event('firebase-ready'));
+        // AUTO LOGIN
+        signInAnonymously(auth)
+            .then(() => {
+                console.log("Cashier signed in");
+                document.dispatchEvent(new Event('firebase-ready'));
+            })
+            .catch((error) => {
+                console.error("Auth Failed:", error);
+                alert("Gagal Login Database: " + error.message);
+            });
     </script>
 
     <script>
         tailwind.config = { theme: { extend: { colors: { 'adamart': { 50: '#f0f9ff', 500: '#0ea5e9', 600: '#0284c7', 900: '#0c4a6e' } } } } }
     </script>
-    <style>
-        body { box-sizing: border-box; }
-        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        .loading { animation: pulse 2s infinite; }
-        .product-card { transition: all 0.2s ease; }
-        .product-card:hover { transform: translateY(-2px); }
-    </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 min-h-screen font-sans">
     
-    <!-- 1. AREA SELECTION (Halaman Depan) -->
+    <!-- 1. AREA SELECTION -->
     <div id="areaSelection" class="min-h-screen flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-8 card-shadow max-w-md w-full">
-            <div class="text-center mb-8"><div class="text-6xl mb-4">⚡</div><h1 class="text-2xl font-bold text-gray-800 mb-2">Adamart Hybrid</h1><p class="text-gray-600">Sistem Kasir Real-time</p></div>
+        <div class="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full border-t-4 border-blue-600">
+            <div class="text-center mb-8"><div class="text-6xl mb-4">⚡</div><h1 class="text-2xl font-bold text-gray-800 mb-2">Adamart Hybrid</h1><p class="text-gray-600">Pilih Area Operasional</p></div>
             <div class="space-y-4">
-                <button onclick="selectArea('adamart 73')" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-xl hover:scale-105 transition-all flex justify-between items-center"><div class="flex items-center gap-3"><span class="text-2xl">🏢</span><div class="text-left font-semibold">Adamart 73<div class="text-xs font-normal opacity-90">Area Utama</div></div></div><span>→</span></button>
-                <button onclick="selectArea('adamart induksi')" class="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl hover:scale-105 transition-all flex justify-between items-center"><div class="flex items-center gap-3"><span class="text-2xl">⚡</span><div class="text-left font-semibold">Adamart Induksi<div class="text-xs font-normal opacity-90">Area Induksi</div></div></div><span>→</span></button>
-                <button onclick="selectArea('adamart kelanis')" class="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 rounded-xl hover:scale-105 transition-all flex justify-between items-center"><div class="flex items-center gap-3"><span class="text-2xl">🌟</span><div class="text-left font-semibold">Adamart Kelanis<div class="text-xs font-normal opacity-90">Area Kelanis</div></div></div><span>→</span></button>
+                <button onclick="selectArea('adamart 73')" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 p-4 rounded-xl transition-all flex justify-between items-center border border-blue-200"><div class="flex items-center gap-3"><span class="text-2xl">🏢</span><div class="text-left font-bold">Adamart 73<div class="text-xs font-normal opacity-70">Area Utama</div></div></div><span>→</span></button>
+                <button onclick="selectArea('adamart induksi')" class="w-full bg-green-50 hover:bg-green-100 text-green-700 p-4 rounded-xl transition-all flex justify-between items-center border border-green-200"><div class="flex items-center gap-3"><span class="text-2xl">⚡</span><div class="text-left font-bold">Adamart Induksi<div class="text-xs font-normal opacity-70">Area Induksi</div></div></div><span>→</span></button>
+                <button onclick="selectArea('adamart kelanis')" class="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 p-4 rounded-xl transition-all flex justify-between items-center border border-purple-200"><div class="flex items-center gap-3"><span class="text-2xl">🌟</span><div class="text-left font-bold">Adamart Kelanis<div class="text-xs font-normal opacity-70">Area Kelanis</div></div></div><span>→</span></button>
             </div>
         </div>
     </div>
 
     <!-- 2. LOADING SCREEN -->
-    <div id="loadingScreen" class="hidden min-h-screen flex items-center justify-center p-4">
-        <div class="text-center"><div class="loading bg-adamart-500 w-16 h-16 rounded-full mx-auto mb-4"></div><h3 class="text-xl font-bold text-gray-800">Menghubungkan...</h3></div>
+    <div id="loadingScreen" class="hidden min-h-screen flex items-center justify-center p-4 bg-white/90 z-50 fixed inset-0">
+        <div class="text-center"><div class="animate-spin text-4xl mb-4 text-blue-600">⏳</div><h3 class="text-xl font-bold text-gray-800">Sinkronisasi Data...</h3></div>
     </div>
 
     <!-- 3. INTERFACE KASIR UTAMA -->
     <div id="cashierInterface" class="hidden flex flex-col h-screen">
-        <header class="bg-gradient-to-r from-blue-600 to-purple-700 text-white p-3 shadow-lg shrink-0">
+        <header class="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-3 shadow-lg shrink-0">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <button onclick="changeArea()" class="bg-white/20 p-2 rounded-lg hover:bg-white/30">🔄</button>
-                    <div><h1 class="text-lg font-bold">Adamart POS</h1><p id="currentArea" class="text-xs opacity-90 font-mono">-</p></div>
+                    <button onclick="changeArea()" class="bg-white/10 p-2 rounded-lg hover:bg-white/20">🔄</button>
+                    <div><h1 class="text-lg font-bold tracking-tight">ADAMART POS</h1><p id="currentArea" class="text-xs opacity-80 font-mono uppercase tracking-widest">-</p></div>
                 </div>
                 
                 <div class="flex items-center gap-2">
-                    <!-- Info Shift Aktif -->
-                    <div class="hidden md:block bg-white/10 px-3 py-1 rounded text-xs">
-                        Kasir: <span id="headerCashierName" class="font-bold">-</span>
+                    <div class="hidden md:block bg-black/20 px-3 py-1 rounded text-xs border border-white/10">
+                        Kasir: <span id="headerCashierName" class="font-bold text-yellow-300">-</span>
                     </div>
                     
-                    <button onclick="showReceivingModal()" class="bg-purple-500 px-3 py-1.5 rounded text-xs font-bold hover:bg-purple-600">📦 Terima</button>
-                    <button onclick="showRequisitionModal()" class="bg-orange-500 px-3 py-1.5 rounded text-xs font-bold hover:bg-orange-600">📝 Req</button>
-                    <!-- TOMBOL TUTUP SHIFT -->
-                    <button onclick="closeShiftModal()" class="bg-red-500 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-600 border border-red-400">🛑 Tutup Shift</button>
+                    <button onclick="showReceivingModal()" class="bg-purple-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-purple-500 flex items-center gap-1 shadow-sm border border-purple-400"><span>📦</span> Cek Kiriman (PO)</button>
+                    <button onclick="closeShiftModal()" class="bg-red-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-500 border border-red-400 shadow-sm">🛑 Tutup Shift</button>
                 </div>
             </div>
         </header>
 
         <div class="flex flex-1 overflow-hidden">
             <!-- Kiri: Produk -->
-            <div class="flex-1 flex flex-col p-4 overflow-hidden bg-gray-50">
-                <div class="bg-white p-3 rounded-lg shadow mb-3 flex gap-2">
-                    <input type="text" id="productSearch" placeholder="🔍 Cari nama / scan barcode..." class="flex-1 p-2 border rounded text-sm focus:ring-2 focus:ring-blue-500">
-                    <select id="productSelect" class="w-40 p-2 border rounded text-sm bg-white"><option value="">Manual...</option></select>
+            <div class="flex-1 flex flex-col p-4 overflow-hidden bg-gray-100">
+                <div class="bg-white p-3 rounded-lg shadow-sm border border-gray-200 mb-3 flex gap-2">
+                    <div class="relative flex-1">
+                        <span class="absolute left-3 top-2.5 text-gray-400">🔍</span>
+                        <input type="text" id="productSearch" placeholder="Cari nama barang atau scan barcode..." class="w-full pl-9 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <select id="productSelect" class="w-48 p-2 border rounded-lg text-sm bg-gray-50"><option value="">Manual Input...</option></select>
                 </div>
-                <div id="productGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto pr-1 pb-20"></div>
+                <div id="productGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto pr-1 pb-20 content-start"></div>
             </div>
 
             <!-- Kanan: Keranjang -->
             <div class="w-96 bg-white shadow-xl flex flex-col border-l border-gray-200 z-20">
-                <div class="p-3 border-b bg-gray-50 flex justify-between items-center">
-                    <h3 class="font-bold text-gray-700">🛒 Keranjang</h3>
-                    <button onclick="clearCart()" class="text-red-500 text-xs font-bold">Hapus Semua</button>
+                <div class="p-4 border-b bg-gray-50 flex justify-between items-center shadow-sm">
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2"><span class="text-xl">🛒</span> Keranjang</h3>
+                    <button onclick="clearCart()" class="text-red-500 text-xs font-bold hover:underline">Kosongkan</button>
                 </div>
-                <div id="cartItems" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
-                <div class="p-4 border-t bg-gray-50">
-                    <div class="flex justify-between font-bold text-xl mb-3 text-gray-800"><span>Total</span><span id="totalAmount">Rp 0</span></div>
+                <div id="cartItems" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white"></div>
+                <div class="p-4 border-t bg-gray-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                    <div class="flex justify-between font-bold text-2xl mb-4 text-gray-800"><span>Total</span><span id="totalAmount" class="text-blue-700">Rp 0</span></div>
                     <div class="grid grid-cols-3 gap-2 mb-3">
-                        <button onclick="selectPaymentMethod('Tunai')" id="payTunai" class="payment-btn bg-white border p-2 rounded text-xs font-bold hover:bg-blue-50">💵 Tunai</button>
-                        <button onclick="selectPaymentMethod('QRIS')" id="payQRIS" class="payment-btn bg-white border p-2 rounded text-xs font-bold hover:bg-blue-50">📱 QRIS</button>
-                        <button onclick="selectPaymentMethod('Kasbon')" id="payKasbon" class="payment-btn bg-white border p-2 rounded text-xs font-bold hover:bg-blue-50">📝 Kasbon</button>
+                        <button onclick="selectPaymentMethod('Tunai')" id="payTunai" class="payment-btn bg-white border border-gray-300 p-2 rounded-lg text-xs font-bold hover:bg-blue-50 transition text-gray-600">💵 Tunai</button>
+                        <button onclick="selectPaymentMethod('QRIS')" id="payQRIS" class="payment-btn bg-white border border-gray-300 p-2 rounded-lg text-xs font-bold hover:bg-blue-50 transition text-gray-600">📱 QRIS</button>
+                        <button onclick="selectPaymentMethod('Kasbon')" id="payKasbon" class="payment-btn bg-white border border-gray-300 p-2 rounded-lg text-xs font-bold hover:bg-blue-50 transition text-gray-600">📝 Kasbon</button>
                     </div>
-                    <!-- Tombol Bayar -->
-                    <button onclick="processTransaction()" id="checkoutBtn" disabled class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold disabled:bg-gray-300 shadow-lg hover:bg-blue-700 transition">Bayar Sekarang</button>
+                    <button onclick="processTransaction()" id="checkoutBtn" disabled class="w-full bg-blue-700 text-white py-3.5 rounded-xl font-bold disabled:bg-gray-300 disabled:cursor-not-allowed shadow-lg hover:bg-blue-800 transition active:scale-95">PROSES PEMBAYARAN</button>
                 </div>
             </div>
         </div>
@@ -123,514 +124,667 @@
 
     <!-- ================= MODAL - MODAL ================= -->
 
-    <!-- 1. MODAL BUKA SHIFT (WAJIB MUNCUL JIKA BELUM BUKA) -->
-    <div id="openShiftModal" class="fixed inset-0 bg-gray-900 z-[70] flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-xl p-8 w-full max-w-md text-center shadow-2xl border-4 border-blue-500">
-            <div class="text-4xl mb-4">☀️</div>
+    <!-- 1. MODAL BUKA SHIFT -->
+    <div id="openShiftModal" class="fixed inset-0 bg-gray-900/95 z-[70] flex items-center justify-center p-4 hidden backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-8 w-full max-w-md text-center shadow-2xl border border-gray-200">
+            <div class="text-5xl mb-4">☀️</div>
             <h2 class="text-2xl font-bold mb-2 text-gray-800">Buka Shift Baru</h2>
-            <p class="text-gray-500 mb-6 text-sm">Masukkan nama Anda dan hitung modal awal di laci.</p>
+            <p class="text-gray-500 mb-6 text-sm">Selamat pagi! Siapkan modal awal kasir.</p>
             <form onsubmit="startShift(event)" class="space-y-4 text-left">
                 <div>
-                    <label class="font-bold text-xs text-gray-600 uppercase">Nama Kasir</label>
+                    <label class="font-bold text-xs text-gray-600 uppercase tracking-wide">Nama Kasir</label>
                     <input type="text" id="shiftCashier" class="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500" required placeholder="Contoh: Budi">
                 </div>
                 <div>
-                    <label class="font-bold text-xs text-gray-600 uppercase">Modal Awal (Rp)</label>
+                    <label class="font-bold text-xs text-gray-600 uppercase tracking-wide">Modal Awal (Rp)</label>
                     <input type="number" id="startCash" class="w-full p-3 border rounded-lg font-mono text-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500" required placeholder="0">
                 </div>
-                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 shadow-lg">🚀 Buka Toko</button>
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 shadow-lg mt-2">🚀 Buka Toko</button>
             </form>
         </div>
     </div>
 
     <!-- 2. MODAL TUTUP SHIFT -->
-    <div id="closeShiftModal" class="hidden fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+    <div id="closeShiftModal" class="hidden fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <h3 class="font-bold text-lg mb-4 border-b pb-2 text-gray-800">🛑 Laporan Tutup Shift</h3>
-            <div class="space-y-2 mb-4 text-sm text-gray-600">
-                <div class="flex justify-between"><span>Kasir:</span> <span class="font-bold text-gray-900" id="cs-name">-</span></div>
-                <div class="flex justify-between"><span>Waktu Buka:</span> <span id="cs-time">-</span></div>
-                <div class="flex justify-between"><span>Modal Awal:</span> <span id="cs-start">0</span></div>
-                <div class="border-t border-dashed my-2 pt-2">
-                    <div class="flex justify-between text-blue-600 font-bold"><span>(+) Penjualan Tunai:</span> <span id="cs-sales">0</span></div>
-                    <div class="flex justify-between"><span>(i) Total QRIS:</span> <span id="cs-qris">0</span></div>
-                    <div class="flex justify-between"><span>(i) Total Kasbon:</span> <span id="cs-kasbon">0</span></div>
+            <h3 class="font-bold text-lg mb-4 border-b pb-2 text-gray-800 flex justify-between"><span>🛑 Laporan Tutup Shift</span><span id="cs-time" class="text-sm font-normal text-gray-500 mt-1"></span></h3>
+            <div class="space-y-3 mb-5 text-sm">
+                <div class="flex justify-between p-2 bg-gray-50 rounded"><span>Kasir Bertugas:</span> <span class="font-bold text-gray-900" id="cs-name">-</span></div>
+                <div class="flex justify-between px-2"><span>Modal Awal:</span> <span id="cs-start">0</span></div>
+                <div class="border-t border-dashed my-2 pt-2 space-y-1">
+                    <div class="flex justify-between text-blue-700 font-bold px-2"><span>(+) Penjualan Tunai:</span> <span id="cs-sales">0</span></div>
+                    <div class="flex justify-between text-gray-500 px-2"><span>(i) Total QRIS:</span> <span id="cs-qris">0</span></div>
+                    <div class="flex justify-between text-gray-500 px-2"><span>(i) Total Kasbon:</span> <span id="cs-kasbon">0</span></div>
                 </div>
-                <div class="flex justify-between font-bold text-lg border-t pt-2 bg-gray-100 p-2 rounded">
+                <div class="flex justify-between font-bold text-lg border-t pt-3 bg-blue-50 p-3 rounded text-blue-900">
                     <span>Harus Ada Fisik:</span> <span id="cs-expected">0</span>
                 </div>
             </div>
             <form onsubmit="finishShift(event)">
-                <div class="mb-4 bg-yellow-50 p-3 rounded border border-yellow-200">
-                    <label class="block text-xs font-bold text-yellow-800 mb-1">HITUNG UANG FISIK DI LACI</label>
-                    <input type="number" id="actualCash" class="w-full p-2 border rounded font-mono text-lg font-bold text-right" required placeholder="0">
+                <div class="mb-4 bg-yellow-50 p-4 rounded border border-yellow-200">
+                    <label class="block text-xs font-bold text-yellow-800 mb-1 uppercase">Hitung Uang Fisik di Laci</label>
+                    <input type="number" id="actualCash" class="w-full p-2 border border-yellow-300 rounded font-mono text-2xl font-bold text-right text-gray-800 focus:outline-none focus:ring-2 focus:ring-yellow-500" required placeholder="0">
                 </div>
-                <div class="flex gap-2">
-                    <button type="button" onclick="document.getElementById('closeShiftModal').classList.add('hidden')" class="flex-1 py-2 bg-gray-200 rounded font-bold text-gray-600">Batal</button>
-                    <button type="submit" class="flex-1 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700 shadow">Simpan & Tutup</button>
+                <div class="flex gap-3">
+                    <button type="button" onclick="document.getElementById('closeShiftModal').classList.add('hidden')" class="flex-1 py-3 bg-gray-200 rounded-lg font-bold text-gray-600 hover:bg-gray-300">Batal</button>
+                    <button type="submit" class="flex-1 py-3 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 shadow-lg">Simpan & Tutup</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- 3. MODAL KASBON (INTEGRASI E-VOUCHER) -->
-    <div id="kasbonModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <!-- 3. MODAL KASBON -->
+    <div id="kasbonModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-xl p-6 w-full max-w-md relative shadow-2xl">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-bold text-lg text-gray-800">💳 Pembayaran Kasbon</h3>
-                <button onclick="closeKasbonModal()" class="text-gray-400 hover:text-gray-600">✕</button>
+                <button onclick="closeKasbonModal()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
             </div>
-
-            <!-- Loading Overlay untuk Cek User -->
-            <div id="kasbonLoading" class="hidden absolute inset-0 bg-white/80 flex items-center justify-center z-10 rounded-xl">
-                <div class="flex flex-col items-center">
-                    <div class="animate-spin text-3xl mb-2">⏳</div>
-                    <span class="text-sm font-bold text-gray-600">Menghubungkan ke Server E-Voucher...</span>
-                </div>
+            <div id="kasbonLoading" class="hidden absolute inset-0 bg-white/90 flex items-center justify-center z-10 rounded-xl">
+                <div class="flex flex-col items-center"><div class="animate-spin text-3xl mb-2">⏳</div><span class="text-sm font-bold text-gray-600">Menghubungkan ke Server...</span></div>
             </div>
-
             <div class="space-y-4">
-                <!-- Input Pencarian -->
-                <div class="bg-gray-50 p-3 rounded-lg border">
-                    <label class="text-xs font-bold text-gray-500 block mb-1">Cari Anggota (NIK / No Anggota)</label>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <label class="text-xs font-bold text-gray-500 block mb-2 uppercase">Cari Anggota (NIK / No Anggota)</label>
                     <div class="flex gap-2">
                         <input type="text" id="kasbonSearchId" placeholder="Contoh: 41069" class="w-full p-2 border rounded font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="button" onclick="checkEvoucherUser()" class="bg-blue-600 text-white px-4 rounded font-bold hover:bg-blue-700">Cek</button>
+                        <button type="button" onclick="checkEvoucherUser()" class="bg-blue-600 text-white px-4 rounded font-bold hover:bg-blue-700 shadow">Cek</button>
                     </div>
                 </div>
-
-                <!-- Hasil Pencarian User -->
                 <div id="evUserInfo" class="hidden bg-blue-50 p-4 rounded-lg border border-blue-200">
                     <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-xs text-gray-500 uppercase font-bold">Nama Anggota</p>
-                            <p class="font-bold text-gray-800 text-lg leading-tight" id="evUserName">-</p>
-                            <p class="text-xs text-gray-500 mt-1">NIK: <span id="evUserNIK" class="font-mono">-</span></p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-xs text-gray-500 uppercase font-bold">Sisa Limit</p>
-                            <p class="font-bold text-green-600 text-xl" id="evUserLimit">Rp 0</p>
-                        </div>
+                        <div><p class="text-xs text-gray-500 uppercase font-bold">Nama Anggota</p><p class="font-bold text-gray-800 text-lg leading-tight" id="evUserName">-</p><p class="text-xs text-gray-500 mt-1">NIK: <span id="evUserNIK" class="font-mono">-</span></p></div>
+                        <div class="text-right"><p class="text-xs text-gray-500 uppercase font-bold">Sisa Limit</p><p class="font-bold text-green-600 text-xl" id="evUserLimit">Rp 0</p></div>
                     </div>
                 </div>
-
-                <!-- Ringkasan Belanja -->
-                <div class="flex justify-between items-center py-2 border-t border-dashed">
+                <div class="flex justify-between items-center py-3 border-t border-dashed">
                     <span class="text-gray-600 font-bold">Total Belanja:</span>
-                    <span class="text-xl font-bold text-gray-800" id="evTotalAmountDisplay">Rp 0</span>
+                    <span class="text-2xl font-bold text-gray-800" id="evTotalAmountDisplay">Rp 0</span>
                 </div>
-                
-                <!-- Hidden Input untuk simpan data user yg ditemukan -->
                 <input type="hidden" id="evFoundUser" value="">
-
-                <button onclick="processKasbonTransaction()" id="evSubmitBtn" class="w-full py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                    Konfirmasi Pembayaran
-                </button>
+                <button onclick="processKasbonTransaction()" id="evSubmitBtn" class="w-full py-3.5 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition" disabled>Konfirmasi Pembayaran</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL LAINNYA (Receipt, Receiving, dll) -->
-    <div id="receiptModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-xl p-6 w-full max-w-md"><div class="text-center mb-4 text-green-600 font-bold text-lg">✅ Transaksi Berhasil</div><div id="receiptContent" class="bg-gray-50 p-4 rounded-lg text-sm mb-4 font-sans"></div><div class="flex gap-3"><button onclick="closeReceiptModal()" class="flex-1 py-2 bg-gray-200 rounded-lg">Tutup</button><button onclick="sendToWhatsApp()" class="flex-1 py-2 bg-green-600 text-white rounded-lg">Kirim WA</button></div></div></div>
-    <div id="toast" class="hidden fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl z-[80] animate-bounce"></div>
-    <!-- (Modal Receiving & Requisition disederhanakan di sini agar tidak terlalu panjang, tapi fungsinya ada di JS) -->
+    <!-- 4. MODAL RECEIVING (KHUSUS PO MANAGER - STRICT & ROBUST) -->
+    <div id="receivingModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-xl p-0 w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <!-- Header Modal -->
+            <div class="p-4 border-b bg-purple-50 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-lg text-purple-800 flex items-center gap-2">
+                        <span>🚛</span> QC & Terima Barang (Restock)
+                    </h3>
+                    <p class="text-xs text-purple-600">Cek kondisi barang dan sesuaikan jumlah sebelum disimpan</p>
+                </div>
+                <button onclick="closeReceivingModal()" class="text-gray-400 hover:text-red-500 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-purple-100">×</button>
+            </div>
+            
+            <div class="flex flex-1 overflow-hidden">
+                <!-- Sidebar: List PO Pending -->
+                <div class="w-1/4 border-r bg-gray-50 flex flex-col">
+                    <div class="p-3 border-b bg-gray-100 font-bold text-xs text-gray-500 uppercase tracking-wide">
+                        Daftar Surat Jalan
+                    </div>
+                    <div id="pendingPOList" class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
+                        <div class="text-center py-8 text-gray-400 text-xs italic">Memuat data...</div>
+                    </div>
+                </div>
+
+                <!-- Main: Detail Barang QC -->
+                <div class="flex-1 flex flex-col bg-white">
+                    <!-- PO Info Header -->
+                    <div id="poDetailHeader" class="p-4 border-b bg-white hidden">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="font-bold text-gray-800 text-lg" id="poBatchNo">-</h4>
+                                <p class="text-sm text-gray-500" id="poSupplier">-</p>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold mb-1">Status: Checking</span>
+                                <p class="text-[10px] text-gray-400">Pastikan jumlah fisik sesuai</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Placeholder -->
+                    <div id="poPlaceholder" class="flex-1 flex flex-col items-center justify-center text-gray-400">
+                        <div class="text-5xl mb-4">⬅️</div>
+                        <p>Pilih Surat Jalan di sebelah kiri</p>
+                    </div>
+
+                    <!-- List Barang (QC Table) -->
+                    <div id="poItemsContainer" class="flex-1 overflow-y-auto p-0 hidden">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100 text-gray-600 text-xs uppercase sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th class="p-3 text-left w-1/3">Produk</th>
+                                    <th class="p-3 text-center w-20">Qty PO</th>
+                                    <th class="p-3 text-center w-24">Fisik</th>
+                                    <th class="p-3 text-center w-32">Kondisi</th>
+                                    <th class="p-3 text-center w-32">Expired</th>
+                                </tr>
+                            </thead>
+                            <tbody id="receivingTableBody" class="divide-y"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Footer Action -->
+                    <div id="poFooter" class="p-4 border-t bg-gray-50 hidden">
+                        <div class="mb-3">
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Catatan Penerimaan (Opsional)</label>
+                            <textarea id="receivingNote" class="w-full p-2 border rounded text-sm bg-white" placeholder="Contoh: 1 dus penyok, pengiriman terlambat, dll..." rows="2"></textarea>
+                        </div>
+                        <div class="flex justify-between items-center mb-3 text-sm">
+                            <div class="text-gray-600 text-xs italic">
+                                Data penerimaan akan dikirim balik ke Manager.
+                            </div>
+                            <span class="font-bold text-lg text-purple-700">Total Terima: <span id="recvTotalItems">0</span> Item</span>
+                        </div>
+                        <button id="btnSubmitRecv" onclick="submitReceiving()" class="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 shadow-lg transition transform active:scale-95">
+                            ✅ Konfirmasi & Simpan Stok
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Receipt & Toast -->
+    <div id="receiptModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl transform transition-all scale-100"><div class="text-center mb-4"><div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-2"><span class="text-2xl text-green-600">✓</span></div><h3 class="text-lg leading-6 font-medium text-gray-900">Transaksi Berhasil</h3></div><div id="receiptContent" class="bg-gray-50 p-4 rounded-lg text-sm mb-4 font-mono border border-gray-200"></div><div class="flex gap-3"><button onclick="closeReceiptModal()" class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium">Tutup</button><button onclick="sendToWhatsApp()" class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow">Kirim WA</button></div></div></div>
+    <div id="toast" class="hidden fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl z-[80] animate-bounce flex items-center gap-2"><span>✅</span><span id="toastMsg">Notification</span></div>
     
     <script>
         // --- KONFIGURASI URL ---
         const POS_API_URL = 'https://script.google.com/macros/s/AKfycbwkZVsoGXdgxck4xwOXk2fW4Oawn6diXu2bUX0sAIRFCfGeS1jTr6QjEH6Fr6-RFbnDAw/exec';
         const EVOUCHER_API_URL = "https://script.google.com/macros/s/AKfycbyQFkZW0QuBXi082jgXTsVBIy1OfVfhaQYVogvr7uBJBrCuGtkM73tTGqA1dl9ThlfL/exec";
 
-        // --- GLOBAL VARIABLES ---
+        // --- GLOBAL VARS ---
         let currentArea = '', availableProducts = [], cart = [], selectedPaymentMethod = '', lastTransaction = null;
-        let activeShift = null;
-        let evoucherUsers = []; // Cache user E-Voucher
+        let activeShift = null, evoucherUsers = [];
+        let receivingCart = [], activePO = null; 
+        
+        // --- CACHE PO ---
+        window.cachedPOs = {}; 
+        window.allProducts = []; // CACHE SEMUA PRODUK (termasuk stok 0)
 
-        // --- HELPER FUNCTIONS ---
+        // --- HELPER ---
         function formatRp(n) { return "Rp " + (n || 0).toLocaleString('id-ID'); }
         function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-xl z-[80] animate-bounce ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
+            document.getElementById('toastMsg').textContent = msg;
+            t.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-xl z-[80] animate-bounce flex items-center gap-2 ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
             t.classList.remove('hidden');
             setTimeout(() => t.classList.add('hidden'), 3000);
         }
 
-        // --- SHIFT MANAGEMENT LOGIC (WAJIB ADA) ---
+        // --- SHIFT LOGIC ---
         function initShift() {
-            const savedShift = localStorage.getItem('adamart_shift');
-            if (savedShift) {
-                activeShift = JSON.parse(savedShift);
-                // Update UI Header
-                const headerName = document.getElementById('headerCashierName');
-                if(headerName) headerName.textContent = activeShift.cashierName;
-                
+            const saved = localStorage.getItem('adamart_shift');
+            if (saved) {
+                activeShift = JSON.parse(saved);
+                document.getElementById('headerCashierName').textContent = activeShift.cashierName;
                 document.getElementById('openShiftModal').classList.add('hidden');
             } else {
-                document.getElementById('openShiftModal').classList.remove('hidden'); // Paksa buka modal
+                document.getElementById('openShiftModal').classList.remove('hidden');
             }
         }
-
         function startShift(e) {
             e.preventDefault();
             const name = document.getElementById('shiftCashier').value;
             const cash = parseInt(document.getElementById('startCash').value);
-            
-            if(!name || isNaN(cash)) return alert("Mohon isi nama dan modal awal.");
-
-            const shiftData = {
-                id: 'SHIFT-' + Date.now(),
-                cashierName: name,
-                startCash: cash,
-                startTime: new Date().toISOString(),
-                area: currentArea
-            };
-            
-            localStorage.setItem('adamart_shift', JSON.stringify(shiftData));
-            activeShift = shiftData;
-            
-            initShift(); // Refresh UI
-            showToast(`Shift dibuka oleh ${name}`);
+            if(!name || isNaN(cash)) return alert("Data tidak valid");
+            const data = { id: 'SHIFT-'+Date.now(), cashierName: name, startCash: cash, startTime: new Date().toISOString(), area: currentArea };
+            localStorage.setItem('adamart_shift', JSON.stringify(data));
+            activeShift = data;
+            initShift(); showToast(`Shift dibuka: ${name}`);
         }
-
         async function closeShiftModal() {
-            if (!activeShift) return alert("Shift belum dibuka!");
-            
-            // Hitung penjualan tunai dari memory/firebase
-            // (Untuk simplifikasi, di sini kita query firebase, tapi di real-time app sebaiknya simpan di local juga)
-            const q = window.query(
-                window.collection(window.db, "sales"),
-                window.where("shiftId", "==", activeShift.id)
-            );
-            
+            if(!activeShift) return alert("Shift belum aktif");
+            const q = window.query(window.collection(window.db, "sales"), window.where("shiftId", "==", activeShift.id));
             const snap = await window.getDocs(q);
-            let cashSales = 0, qrisSales = 0, kasbonSales = 0;
-
-            snap.forEach(doc => { 
-                const s = doc.data();
-                if (s.method === 'Tunai') cashSales += s.total;
-                else if (s.method === 'QRIS') qrisSales += s.total;
-                else if (s.method === 'Kasbon') kasbonSales += s.total;
-            });
-
-            const expected = activeShift.startCash + cashSales;
+            let cash=0, qris=0, kasbon=0;
+            snap.forEach(d => { const v=d.data(); if(v.method==='Tunai') cash+=v.total; else if(v.method==='QRIS') qris+=v.total; else kasbon+=v.total; });
             
-            // Update UI Modal
             document.getElementById('cs-name').textContent = activeShift.cashierName;
-            document.getElementById('cs-time').textContent = new Date(activeShift.startTime).toLocaleTimeString();
+            document.getElementById('cs-time').textContent = new Date().toLocaleTimeString();
             document.getElementById('cs-start').textContent = formatRp(activeShift.startCash);
-            document.getElementById('cs-sales').textContent = formatRp(cashSales);
-            document.getElementById('cs-qris').textContent = formatRp(qrisSales);
-            document.getElementById('cs-kasbon').textContent = formatRp(kasbonSales);
-            document.getElementById('cs-expected').textContent = formatRp(expected);
+            document.getElementById('cs-sales').textContent = formatRp(cash);
+            document.getElementById('cs-qris').textContent = formatRp(qris);
+            document.getElementById('cs-kasbon').textContent = formatRp(kasbon);
+            document.getElementById('cs-expected').textContent = formatRp(activeShift.startCash + cash);
             
-            // Simpan data sementara di elemen modal
-            const modal = document.getElementById('closeShiftModal');
-            modal.dataset.expected = expected;
-            modal.dataset.cashSales = cashSales;
-            modal.dataset.qrisSales = qrisSales;
-            modal.dataset.kasbonSales = kasbonSales;
-            
-            modal.classList.remove('hidden');
+            const m = document.getElementById('closeShiftModal');
+            m.dataset.exp = activeShift.startCash + cash; m.dataset.cash = cash; m.dataset.qris = qris; m.dataset.kasbon = kasbon;
+            m.classList.remove('hidden');
         }
-
         async function finishShift(e) {
             e.preventDefault();
+            const act = parseInt(document.getElementById('actualCash').value);
             const m = document.getElementById('closeShiftModal');
-            const actual = parseInt(document.getElementById('actualCash').value);
-            const diff = actual - parseInt(m.dataset.expected);
-
-            const report = {
-                shiftId: activeShift.id,
-                cashierName: activeShift.cashierName,
-                openTime: activeShift.startTime,
-                startCash: activeShift.startCash,
-                expectedCashSales: parseInt(m.dataset.cashSales),
-                totalQris: parseInt(m.dataset.qrisSales),
-                totalKasbon: parseInt(m.dataset.kasbonSales),
-                actualCash: actual,
-                difference: diff,
-                area: currentArea
+            const rep = {
+                shiftId: activeShift.id, cashierName: activeShift.cashierName, openTime: activeShift.startTime,
+                startCash: activeShift.startCash, expectedCashSales: parseInt(m.dataset.cash),
+                totalQris: parseInt(m.dataset.qris), totalKasbon: parseInt(m.dataset.kasbon),
+                actualCash: act, difference: act - parseInt(m.dataset.exp), area: currentArea, closeTime: new Date().toISOString()
             };
+            try {
+                await window.addDoc(window.collection(window.db, "shifts"), rep);
+                fetch(POS_API_URL, { method: 'POST', body: JSON.stringify({action: 'record_shift', data: rep}) });
+                localStorage.removeItem('adamart_shift'); activeShift = null;
+                alert("Shift Ditutup. Sampai jumpa!"); location.reload();
+            } catch(e) { alert("Error: "+e.message); }
+        }
+
+        // --- PAYMENT & E-VOUCHER ---
+        function selectPaymentMethod(m) {
+            selectedPaymentMethod = m;
+            document.querySelectorAll('.payment-btn').forEach(b => b.className = 'payment-btn bg-white border border-gray-300 p-2 rounded-lg text-xs font-bold hover:bg-blue-50 transition text-gray-600');
+            document.getElementById('pay'+m).className = 'payment-btn bg-blue-50 border border-blue-500 p-2 rounded-lg text-xs font-bold text-blue-700 shadow-sm';
+            updateCartDisplay();
+        }
+        async function loadEvoucherData() {
+            try { const d = await (await fetch(`${EVOUCHER_API_URL}?periode=${new Date().getMonth()+1}-${new Date().getFullYear()}`)).json(); if(Array.isArray(d)) evoucherUsers = d; } catch(e){}
+        }
+        function checkEvoucherUser() {
+            const id = document.getElementById('kasbonSearchId').value.trim();
+            if(!id) return showToast("Masukkan ID", true);
+            document.getElementById('kasbonLoading').classList.remove('hidden');
+            setTimeout(() => {
+                const u = evoucherUsers.find(x => String(x.noAnggota)===id || String(x.nik)===id);
+                document.getElementById('kasbonLoading').classList.add('hidden');
+                if(u) {
+                    document.getElementById('evUserInfo').classList.remove('hidden');
+                    document.getElementById('evUserName').textContent = u.name;
+                    document.getElementById('evUserNIK').textContent = u.nik;
+                    const rem = u.limit - (u.used||0);
+                    document.getElementById('evUserLimit').textContent = formatRp(rem);
+                    document.getElementById('evFoundUser').value = JSON.stringify(u);
+                    const btn = document.getElementById('evSubmitBtn');
+                    const tot = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
+                    btn.disabled = rem < tot;
+                    if(rem < tot) { btn.textContent = "Limit Kurang"; btn.classList.add('bg-gray-400'); }
+                    else { btn.textContent = "Konfirmasi Pembayaran"; btn.classList.remove('bg-gray-400'); }
+                } else showToast("User tidak ditemukan", true);
+            }, 500);
+        }
+        function processTransaction() {
+            if(selectedPaymentMethod==='Kasbon') {
+                document.getElementById('kasbonSearchId').value=''; document.getElementById('evUserInfo').classList.add('hidden');
+                document.getElementById('evTotalAmountDisplay').textContent = document.getElementById('totalAmount').textContent;
+                document.getElementById('kasbonModal').classList.remove('hidden');
+            } else executeTransaction();
+        }
+        function processKasbonTransaction() {
+            const u = JSON.parse(document.getElementById('evFoundUser').value);
+            const tot = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
+            const pl = {
+                idUser: u.noAnggota!=='-'?u.noAnggota:u.nik, nama: u.name, merchant: "Adamart POS", nominal: tot,
+                keterangan: "Belanja "+currentArea, kodeVoucher: "KA"+Date.now(), periode: `${new Date().getMonth()+1}-${new Date().getFullYear()}`,
+                tanggal: new Date().toISOString().split('T')[0], id: "TX-"+Date.now()
+            };
+            document.getElementById('kasbonLoading').classList.remove('hidden');
+            fetch(EVOUCHER_API_URL, {method:'POST', mode:'no-cors', body:JSON.stringify(pl)})
+            .then(() => {
+                document.getElementById('kasbonLoading').classList.add('hidden'); closeKasbonModal();
+                executeTransaction({memberNumber: `${u.name} (${u.noAnggota})`});
+            });
+        }
+        async function executeTransaction(ex={}) {
+            if(!activeShift) return alert("Buka Shift dulu");
+            try {
+                const tot = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
+                const d = { 
+                    area: currentArea, shiftId: activeShift.id, items: cart.map(i=>`${i.name} x${i.quantity}`).join(', '),
+                    total: tot, method: selectedPaymentMethod, cart: cart, ...ex, timestamp: new Date().toISOString()
+                };
+                await window.addDoc(window.collection(window.db,"sales"), d);
+                for(const i of cart) {
+                    await window.updateDoc(window.doc(window.db,"products",i.docId), {[`Stok Area Kasir ${currentArea}`]: window.increment(-i.quantity)});
+                }
+                fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_sale', data:d})});
+                lastTransaction=d; showReceipt(); resetTransaction(); showToast("Transaksi Berhasil"); loadProducts();
+            } catch(e) { alert("Gagal: "+e.message); }
+        }
+
+        // --- LOGISTIK: RECEIVING WITH QC & AUTO-STOCK (FIXED ID LOOKUP) ---
+        function showReceivingModal() {
+            activePO = null; receivingCart = []; 
+            document.getElementById('poDetailHeader').classList.add('hidden');
+            document.getElementById('poItemsContainer').classList.add('hidden');
+            document.getElementById('poFooter').classList.add('hidden');
+            document.getElementById('poPlaceholder').classList.remove('hidden');
+            checkPendingPO(); 
+            document.getElementById('receivingModal').classList.remove('hidden');
+        }
+
+        async function checkPendingPO() {
+            const listEl = document.getElementById('pendingPOList');
+            listEl.innerHTML = '<div class="text-center py-4 text-gray-400 text-xs animate-pulse">Mencari Kiriman...</div>';
+            try {
+                const q = window.query(window.collection(window.db, "purchases"), window.where("status", "==", "pending"));
+                const snap = await window.getDocs(q);
+                let html = '';
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    // Match area case-insensitive
+                    if (data.branch && data.branch.toLowerCase() === currentArea.toLowerCase()) {
+                        window.cachedPOs[doc.id] = data; 
+                        const itemCount = JSON.parse(data.items).length;
+                        html += `<div onclick="window.loadPO('${doc.id}')" class="bg-white border hover:border-purple-500 p-3 rounded-lg cursor-pointer shadow-sm mb-2 group transition active:bg-purple-50"><div class="flex justify-between items-start mb-1"><div class="font-bold text-xs text-purple-800">${data.batchNumber}</div><span class="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full">${new Date(data.createdAt).toLocaleDateString()}</span></div><div class="text-xs text-gray-600 mb-2 font-medium">${data.supplier}</div><div class="flex justify-between items-center bg-gray-50 p-2 rounded"><span class="text-gray-500 text-[10px] font-bold">${itemCount} Jenis Barang</span><span class="text-purple-600 group-hover:underline text-xs font-bold">Pilih →</span></div></div>`;
+                    }
+                });
+                listEl.innerHTML = html || '<div class="flex flex-col items-center justify-center py-10 text-gray-400 text-xs"><span class="text-3xl mb-2">📭</span>Tidak ada kiriman baru.</div>';
+            } catch(e) { console.error(e); listEl.innerHTML = '<div class="text-center py-4 text-red-400 text-xs">Gagal memuat data.</div>'; }
+        }
+
+        window.loadPO = function(docId) {
+            // RELOAD PRODUCTS TO ENSURE LATEST DATA
+            loadProducts().then(() => {
+                const data = window.cachedPOs[docId];
+                if (!data) return; 
+                activePO = { id: docId, ...data };
+                receivingCart = []; 
+                try {
+                    const items = JSON.parse(data.items);
+                    items.forEach(item => {
+                        // MATCHING: Gunakan String comparison yang ketat untuk Barcode
+                        // Pastikan window.allProducts sudah terisi
+                        const localProd = window.allProducts.find(p => String(p.Barcode) === String(item.barcode));
+                        
+                        const poData = { price: parseInt(item.price || 0), hpp: parseInt(item.hpp || 0) };
+
+                        const baseItem = localProd ? 
+                            localProd : 
+                            { 
+                                id: null, // Flag sebagai produk baru
+                                'Nama Produk': item.name, 
+                                Barcode: item.barcode, 
+                                isNew: true,
+                                Harga: poData.price, 
+                                HPP: poData.hpp      
+                            };
+                        
+                        receivingCart.push({ ...baseItem, poQty: parseInt(item.qty), receivedQty: parseInt(item.qty), condition: 'Baik', expiry: '' });
+                    });
+                    document.getElementById('poBatchNo').textContent = data.batchNumber;
+                    document.getElementById('poSupplier').textContent = data.supplier;
+                    document.getElementById('poPlaceholder').classList.add('hidden');
+                    document.getElementById('poDetailHeader').classList.remove('hidden');
+                    document.getElementById('poItemsContainer').classList.remove('hidden');
+                    document.getElementById('poFooter').classList.remove('hidden');
+                    renderReceiving();
+                } catch(e) { alert("Data PO korup: " + e.message); }
+            });
+        };
+
+        window.updateRecvItem = function(idx, field, value) {
+            if(field === 'receivedQty') receivingCart[idx].receivedQty = parseInt(value) || 0;
+            else if(field === 'condition') receivingCart[idx].condition = value;
+            else if(field === 'expiry') receivingCart[idx].expiry = value;
+            renderReceiving();
+        }
+
+        function renderReceiving() {
+            const b = document.getElementById('receivingTableBody');
+            b.innerHTML = receivingCart.map((i,x)=>`
+                <tr class="hover:bg-purple-50 border-b transition">
+                    <td class="p-3">
+                        <div class="font-bold text-gray-800 text-sm">${i['Nama Produk']}</div>
+                        <div class="text-xs text-gray-500 font-mono">${i.Barcode}</div>
+                        ${i.isNew ? '<span class="text-[10px] bg-red-100 text-red-800 px-1 rounded font-bold">BARU (Auto-Create)</span>' : ''}
+                    </td>
+                    <td class="p-3 text-center">
+                        <span class="bg-gray-100 px-2 py-1 rounded text-xs font-bold text-gray-500">${i.poQty}</span>
+                    </td>
+                    <td class="p-3 text-center">
+                        <input type="number" value="${i.receivedQty}" onchange="window.updateRecvItem(${x}, 'receivedQty', this.value)" class="w-16 p-1 text-center border rounded text-sm font-bold focus:ring-2 focus:ring-purple-500 ${i.receivedQty !== i.poQty ? 'text-red-600 border-red-300 bg-red-50' : 'text-green-700'}">
+                    </td>
+                    <td class="p-3 text-center">
+                        <select onchange="window.updateRecvItem(${x}, 'condition', this.value)" class="p-1 border rounded text-xs ${i.condition==='Rusak'?'bg-red-100 text-red-700 font-bold':'bg-white'}">
+                            <option value="Baik" ${i.condition==='Baik'?'selected':''}>Baik</option>
+                            <option value="Rusak" ${i.condition==='Rusak'?'selected':''}>Rusak</option>
+                        </select>
+                    </td>
+                    <td class="p-3 text-center">
+                        <input type="date" value="${i.expiry}" onchange="window.updateRecvItem(${x}, 'expiry', this.value)" class="w-28 p-1 border rounded text-xs">
+                    </td>
+                </tr>`).join('');
+            
+            const totalGood = receivingCart.reduce((s,i) => s + (i.condition==='Baik' ? i.receivedQty : 0), 0);
+            document.getElementById('recvTotalItems').textContent = totalGood;
+        }
+
+        // FIXED SUBMIT FUNCTION: ROBUST ID LOOKUP AND FIELD CREATION
+        async function submitReceiving() {
+            if(!activePO || receivingCart.length===0) return;
+            const totalGood = receivingCart.reduce((s,i) => s + (i.condition==='Baik' ? i.receivedQty : 0), 0);
+            const note = document.getElementById('receivingNote').value;
+            
+            if(!confirm(`Konfirmasi penerimaan? \nTotal Stok Layak Jual Bertambah: ${totalGood}`)) return;
+            
+            const btn = document.getElementById('btnSubmitRecv');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = "⏳ Memproses...";
 
             try {
-                // 1. Simpan ke Firebase
-                await window.addDoc(window.collection(window.db, "shifts"), report);
-                // 2. Simpan ke Google Sheet POS
-                fetch(POS_API_URL, { method: 'POST', body: JSON.stringify({action: 'record_shift', data: report}) });
+                const k = `Stok Area Kasir ${currentArea}`; // Pastikan nama field ini SAMA PERSIS dengan di database
+                let processed = 0;
+                let failures = [];
                 
-                // 3. Reset
-                localStorage.removeItem('adamart_shift');
-                activeShift = null;
-                alert(`Shift Ditutup.\nSelisih: ${formatRp(diff)}\nSilakan refresh.`);
-                location.reload();
-            } catch(err) {
-                alert("Error: " + err.message);
+                // 1. PROCESS STOCK UPDATE
+                for (const item of receivingCart) {
+                    if(item.condition === 'Baik' && item.receivedQty > 0) {
+                        try {
+                            // SEARCH AGAIN IN DB TO BE 100% SURE (Avoids stale cache issues)
+                            // Gunakan String(item.Barcode) untuk mengatasi masalah tipe data angka/teks
+                            const q = window.query(window.collection(window.db, "products"), window.where("Barcode", "==", String(item.Barcode)));
+                            const snap = await window.getDocs(q);
+                            
+                            if (!snap.empty) {
+                                // PRODUK ADA -> UPDATE
+                                const docRef = snap.docs[0].ref;
+                                const currentData = snap.docs[0].data();
+                                
+                                // Cek apakah field stok untuk cabang ini sudah ada?
+                                // Gunakan setDoc dengan merge: true agar field stok baru otomatis dibuat jika belum ada
+                                const updateData = {[k]: window.increment(Number(item.receivedQty))};
+                                if(item.expiry) updateData['ExpiryDate'] = item.expiry;
+                                
+                                await window.setDoc(docRef, updateData, { merge: true });
+                            } else {
+                                // PRODUK TIDAK ADA -> BUAT BARU
+                                const newProduct = {
+                                    "Nama Produk": item['Nama Produk'].replace(" (NEW)", "").replace(" (Baru)", "").replace(" (Auto-Create)", ""),
+                                    "Barcode": String(item.Barcode),
+                                    "Harga": Number(item.Harga) || 0,
+                                    "HPP": Number(item.HPP) || 0,
+                                    [k]: Number(item.receivedQty)
+                                };
+                                if(item.expiry) newProduct['ExpiryDate'] = item.expiry;
+                                await window.addDoc(window.collection(window.db, "products"), newProduct);
+                            }
+                        } catch (err) {
+                            console.error("Error updating item:", item['Nama Produk'], err);
+                            failures.push(item['Nama Produk']);
+                        }
+                    }
+                    processed++;
+                    btn.textContent = `⏳ ${processed}/${receivingCart.length}...`;
+                }
+
+                if (failures.length > 0) {
+                    alert("Beberapa barang gagal disimpan: " + failures.join(", "));
+                } else {
+                    // 2. Log Inventory
+                    const log = {
+                        logId: "RCV-"+Date.now(), type: "RECEIVING", area: currentArea,
+                        items: receivingCart.map(i=>({
+                            name: i['Nama Produk'], qtyPO: i.poQty, qtyReceived: i.receivedQty,
+                            condition: i.condition, expiry: i.expiry || '-'
+                        })),
+                        poReference: activePO.batchNumber,
+                        note: note,
+                        timestamp: new Date().toISOString(), user: activeShift?activeShift.cashierName:"Admin"
+                    };
+                    await window.addDoc(window.collection(window.db,"inventory_logs"), log);
+
+                    // 3. Close PO
+                    await window.updateDoc(window.doc(window.db, "purchases", activePO.id), { 
+                        status: 'received',
+                        receivedAt: new Date().toISOString(),
+                        receivedBy: activeShift ? activeShift.cashierName : 'Admin',
+                        receivingNote: note
+                    });
+
+                    // 4. Sync Sheet
+                    fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_receiving', data:log})});
+                    
+                    alert("✅ Barang Diterima & Stok Berhasil Diupdate!");
+                    closeReceivingModal(); 
+                    loadProducts(); // Refresh tampilan kasir
+                }
+
+            } catch(e) { 
+                console.error(e);
+                alert("Gagal proses Global: "+e.message); 
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
             }
         }
 
+        // --- CORE UI ---
+        function clearCart() { if(cart.length && confirm("Hapus?")) { cart=[]; updateCartDisplay(); } }
+        function changeArea() { if(confirm("Ganti Area?")) location.reload(); }
+        function resetTransaction() { cart=[]; selectedPaymentMethod=''; document.getElementById('checkoutBtn').disabled=true; document.getElementById('checkoutBtn').textContent="PROSES PEMBAYARAN"; updateCartDisplay(); document.querySelectorAll('.payment-btn').forEach(b=>b.className='payment-btn bg-white border border-gray-300 p-2 rounded-lg text-xs font-bold text-gray-600'); }
+        function closeReceivingModal() { document.getElementById('receivingModal').classList.add('hidden'); }
+        function closeReceiptModal() { document.getElementById('receiptModal').classList.add('hidden'); }
+        function closeKasbonModal() { document.getElementById('kasbonModal').classList.add('hidden'); }
 
-        // --- E-VOUCHER INTEGRATION LOGIC ---
+        async function selectArea(area) {
+            currentArea = area; document.getElementById('areaSelection').classList.add('hidden'); document.getElementById('loadingScreen').classList.remove('hidden');
+            const c = setInterval(async()=>{if(window.db){clearInterval(c);await loadProducts();document.getElementById('loadingScreen').classList.add('hidden');document.getElementById('cashierInterface').classList.remove('hidden');document.getElementById('currentArea').textContent=area;initShift();}},100);
+        }
 
-        // 1. Load User Data (Background)
-        async function loadEvoucherData() {
-            const today = new Date();
-            const period = `${today.getMonth() + 1}-${today.getFullYear()}`;
+        // --- RESTORED FUNCTIONS ---
+        async function loadProducts() {
             try {
-                const res = await fetch(`${EVOUCHER_API_URL}?periode=${period}`);
-                const data = await res.json();
-                if(Array.isArray(data)) evoucherUsers = data;
-            } catch(e) { console.error("EVoucher Data Error", e); }
-        }
-
-        // 2. Cek User (Saat Kasir ketik NIK)
-        function checkEvoucherUser() {
-            const id = document.getElementById('kasbonSearchId').value.trim();
-            if (!id) return showToast("Masukkan NIK/No Anggota", true);
-            
-            document.getElementById('kasbonLoading').classList.remove('hidden');
-
-            // Helper local function
-            const performCheck = () => {
-                const user = evoucherUsers.find(u => String(u.noAnggota) === id || String(u.nik) === id);
-                document.getElementById('kasbonLoading').classList.add('hidden');
-
-                if(user) {
-                    document.getElementById('evUserInfo').classList.remove('hidden');
-                    document.getElementById('evUserName').textContent = user.name;
-                    document.getElementById('evUserNIK').textContent = user.nik;
-                    
-                    const remaining = user.limit - (user.used || 0);
-                    const totalCart = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
-                    
-                    document.getElementById('evUserLimit').textContent = formatRp(remaining);
-                    document.getElementById('evFoundUser').value = JSON.stringify(user);
-                    
-                    const btn = document.getElementById('evSubmitBtn');
-                    if (remaining < totalCart) {
-                        document.getElementById('evUserLimit').className = 'font-bold text-red-600 text-xl';
-                        btn.disabled = true;
-                        btn.textContent = "Limit Tidak Cukup";
-                        btn.classList.add('bg-gray-400'); btn.classList.remove('bg-green-600');
-                    } else {
-                        document.getElementById('evUserLimit').className = 'font-bold text-green-600 text-xl';
-                        btn.disabled = false;
-                        btn.textContent = "Konfirmasi Pembayaran";
-                        btn.classList.remove('bg-gray-400'); btn.classList.add('bg-green-600');
-                    }
-                } else {
-                    showToast("Anggota tidak ditemukan!", true);
-                }
-            };
-
-            if(evoucherUsers.length === 0) loadEvoucherData().then(performCheck);
-            else performCheck();
-        }
-
-        // 3. Proses Transaksi Kasbon (Integrasi)
-        function processKasbonTransaction() {
-            const userStr = document.getElementById('evFoundUser').value;
-            if(!userStr) return;
-            
-            const user = JSON.parse(userStr);
-            const totalCart = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
-            
-            // Validasi ulang
-            if ((user.limit - (user.used || 0)) < totalCart) return alert("Limit tidak mencukupi.");
-
-            const evPayload = {
-                idUser: user.noAnggota !== '-' ? user.noAnggota : user.nik,
-                nama: user.name,
-                merchant: "Adamart POS (" + currentArea + ")",
-                nominal: totalCart,
-                keterangan: "Belanja di " + currentArea,
-                kodeVoucher: "KA" + Math.floor(Date.now() / 1000),
-                periode: `${new Date().getMonth() + 1}-${new Date().getFullYear()}`,
-                tanggal: new Date().toISOString().split('T')[0],
-                id: "TX-" + Date.now()
-            };
-
-            document.getElementById('kasbonLoading').classList.remove('hidden');
-
-            // A. Kirim ke E-Voucher System
-            fetch(EVOUCHER_API_URL, {
-                method: 'POST', mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(evPayload)
-            }).then(() => {
-                // B. Jika sukses, Lanjutkan catat di POS
-                document.getElementById('kasbonLoading').classList.add('hidden');
-                closeKasbonModal();
+                const q = window.query(window.collection(window.db, "products"));
+                const querySnapshot = await window.getDocs(q);
+                const products = [];
+                // FIX: Load ALL products for system reference (even stock 0) for QC check
+                querySnapshot.forEach((doc) => { products.push({ id: doc.id, ...doc.data() }); });
                 
-                // Panggil fungsi transaksi utama (Firebase + Sheet POS)
-                executeTransaction({
-                    memberNumber: `${user.name} (${user.noAnggota})`,
-                    minePermit: user.nik 
-                });
-            }).catch(err => {
-                document.getElementById('kasbonLoading').classList.add('hidden');
-                alert("Gagal koneksi E-Voucher: " + err.message);
+                window.allProducts = products; // Save to global cache
+                
+                // Filter for Sales UI (only stock > 0)
+                const stockKey = `Stok Area Kasir ${currentArea}`;
+                availableProducts = products.filter(p => (p[stockKey] || 0) > 0); 
+                
+                populateSelects(); displayProducts();
+            } catch (e) {
+                console.error("Firebase Error:", e); showToast("Gagal memuat data produk", true);
+            }
+        }
+
+        function populateSelects() {
+            const s = document.getElementById('productSelect');
+            s.innerHTML = '<option value="">Manual Input...</option>';
+            availableProducts.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.Barcode; opt.textContent = `${p['Nama Produk']} - ${formatRp(p.Harga)}`;
+                s.appendChild(opt);
             });
         }
 
+        function displayProducts(products = availableProducts) {
+            const container = document.getElementById('productGrid');
+            if(!container) return;
+            const stockKey = `Stok Area Kasir ${currentArea}`;
+            container.innerHTML = products.map(p => `
+                <div class="bg-white p-3 rounded-lg shadow-sm border hover:border-blue-500 transition cursor-pointer flex flex-col h-full" onclick="addToCart('${String(p.Barcode).replace(/'/g, "\\'")}')">
+                    <div class="flex-1"><h4 class="font-bold text-gray-800 text-sm line-clamp-2">${p['Nama Produk']}</h4><div class="flex justify-between items-center mt-2 text-xs text-gray-500"><span class="bg-gray-100 px-2 py-1 rounded">${p.Barcode}</span><span class="font-bold">Stok: ${p[stockKey]}</span></div></div>
+                    <div class="mt-3 pt-2 border-t flex justify-between items-center"><span class="text-blue-700 font-bold text-sm">${formatRp(p.Harga)}</span><div class="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">+</div></div>
+                </div>`).join('');
+        }
 
-        // --- MAIN TRANSACTION LOGIC ---
+        function filterProducts() {
+            const term = document.getElementById('productSearch').value.toLowerCase();
+            const filtered = availableProducts.filter(p => String(p['Nama Produk']).toLowerCase().includes(term) || String(p.Barcode).toLowerCase().includes(term));
+            displayProducts(filtered);
+        }
 
-        function processTransaction() {
-            if(selectedPaymentMethod === 'Kasbon') {
-                // Buka Modal E-Voucher
-                document.getElementById('kasbonSearchId').value = '';
-                document.getElementById('evUserInfo').classList.add('hidden');
-                document.getElementById('evSubmitBtn').disabled = true;
-                // document.getElementById('evTotalAmount').textContent = document.getElementById('totalAmount').textContent;
-                // FIX: Gunakan ID yang benar
-                document.getElementById('evTotalAmountDisplay').textContent = document.getElementById('totalAmount').textContent;
-                document.getElementById('kasbonModal').classList.remove('hidden');
-            } else {
-                // Tunai / QRIS langsung proses
-                executeTransaction();
+        function selectProduct() {
+            const val = document.getElementById('productSelect').value;
+            if(val) { addToCart(val); document.getElementById('productSelect').value = ''; }
+        }
+
+        function addToCart(barcode) {
+            const product = availableProducts.find(p => String(p.Barcode) == String(barcode));
+            if (!product) return showToast("Produk tidak valid", true);
+            const existing = cart.find(i => String(i.barcode) == String(barcode));
+            if(existing) { existing.quantity++; } else { cart.push({ barcode: product.Barcode, name: product['Nama Produk'], price: product.Harga, quantity: 1, docId: product.id }); }
+            updateCartDisplay(); showToast("Produk masuk keranjang");
+        }
+
+        function updateCartDisplay() {
+            const container = document.getElementById('cartItems');
+            const totalEl = document.getElementById('totalAmount');
+            const checkoutBtn = document.getElementById('checkoutBtn');
+            const evTotal = document.getElementById('evTotalAmountDisplay');
+            if (!container) return;
+            let total = 0;
+            if (cart.length === 0) { container.innerHTML = '<div class="text-center text-gray-400 py-8 text-sm flex flex-col items-center"><span class="text-2xl mb-2">🛒</span>Keranjang Kosong</div>'; } 
+            else {
+                container.innerHTML = cart.map((item, idx) => {
+                    total += item.price * item.quantity;
+                    return `<div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm"><div class="flex-1 overflow-hidden mr-2"><div class="font-bold text-gray-800 truncate">${item.name}</div><div class="text-xs text-gray-500 mt-1">${formatRp(item.price)} x ${item.quantity}</div></div><div class="flex items-center gap-2"><button onclick="modQty(${idx}, -1)" class="w-7 h-7 bg-white border border-gray-300 text-gray-600 rounded-full flex items-center justify-center hover:bg-red-50 hover:border-red-200 hover:text-red-500 font-bold transition">-</button><span class="font-bold w-4 text-center text-gray-800">${item.quantity}</span><button onclick="modQty(${idx}, 1)" class="w-7 h-7 bg-white border border-gray-300 text-gray-600 rounded-full flex items-center justify-center hover:bg-green-50 hover:border-green-200 hover:text-green-600 font-bold transition">+</button></div></div>`;
+                }).join('');
+            }
+            totalEl.textContent = formatRp(total);
+            if(evTotal) evTotal.textContent = formatRp(total);
+            if(checkoutBtn) {
+                checkoutBtn.disabled = cart.length === 0 || !selectedPaymentMethod;
+                if(cart.length === 0) checkoutBtn.textContent = "KERANJANG KOSONG";
+                else if(!selectedPaymentMethod) checkoutBtn.textContent = "PILIH METODE BAYAR";
+                else checkoutBtn.textContent = `BAYAR ${formatRp(total)}`;
             }
         }
 
-        async function executeTransaction(extraData = {}) {
-            if (!activeShift) return alert("ERROR: Shift belum dibuka!");
-            
-            try {
-                const data = {
-                    area: currentArea,
-                    shiftId: activeShift.id,
-                    items: cart.map(i => `${i.name} x${i.quantity}`).join(', '),
-                    total: cart.reduce((s, i) => s + (i.price * i.quantity), 0),
-                    method: selectedPaymentMethod,
-                    cart: cart,
-                    ...extraData,
-                    timestamp: new Date().toISOString()
-                };
-
-                // 1. Simpan ke Firestore (Realtime)
-                await window.addDoc(window.collection(window.db, "sales"), data);
-                
-                // 2. Update Stok di Firestore
-                const stockKey = `Stok Area Kasir ${currentArea}`;
-                for (const item of cart) { 
-                    const productRef = window.doc(window.db, "products", item.docId); 
-                    await window.updateDoc(productRef, { [stockKey]: window.increment(-item.quantity) }); 
-                }
-                
-                // 3. Backup ke Google Sheet POS (Background)
-                fetch(POS_API_URL, { method: 'POST', body: JSON.stringify({action: 'record_sale', data: data}) }).catch(console.error);
-                
-                // 4. Selesai
-                lastTransaction = data;
-                showReceipt();
-                resetTransaction();
-                showToast("Transaksi Berhasil!");
-                loadProducts(); // Refresh stok di layar
-            } catch (e) { 
-                console.error(e); 
-                showToast("Gagal transaksi", true); 
-            }
-        }
-
-        // --- UI HELPERS ---
-        function selectPaymentMethod(method) {
-            selectedPaymentMethod = method;
-            document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-700'));
-            document.getElementById('pay' + method).classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
-            
-            // Update text tombol bayar
-            const btn = document.getElementById('checkoutBtn');
-            if (method === 'Kasbon') btn.textContent = "Lanjut ke Validasi Anggota";
-            else btn.textContent = "Bayar Sekarang";
-            
+        function modQty(idx, change) {
+            cart[idx].quantity += change;
+            if(cart[idx].quantity <= 0) cart.splice(idx, 1);
             updateCartDisplay();
         }
 
-        function closeKasbonModal() { document.getElementById('kasbonModal').classList.add('hidden'); }
-        function closeReceiptModal() { document.getElementById('receiptModal').classList.add('hidden'); }
-        
-        // ... (Sisa fungsi helper seperti loadProducts, addToCart, dll sama seperti sebelumnya) ...
-        
-        document.addEventListener('DOMContentLoaded', () => {
+        function showReceipt() {
+            const t = lastTransaction; if(!t) return;
+            let h = `<div class="text-center font-bold text-lg mb-1">ADAMART</div><div class="text-center text-xs text-gray-500 mb-4">${new Date(t.timestamp).toLocaleString()}</div><div class="border-b border-dashed my-2"></div>`;
+            t.cart.forEach(i => { h += `<div class="flex justify-between text-sm py-1"><span>${i.name} <span class="text-xs text-gray-500">x${i.quantity}</span></span><span>${formatRp(i.price * i.quantity)}</span></div>`; });
+            h += `<div class="border-b border-dashed my-2"></div><div class="flex justify-between font-bold text-lg mt-2"><span>TOTAL</span><span>${formatRp(t.total)}</span></div><div class="flex justify-between text-sm mt-1 text-gray-600"><span>Metode</span><span>${t.method}</span></div>`;
+            if(t.memberNumber) { h += `<div class="mt-4 bg-gray-100 p-2 rounded text-xs text-center"><div class="font-bold">KASBON MEMBER</div><div>${t.memberNumber}</div></div>`; }
+            document.getElementById('receiptContent').innerHTML = h;
+            document.getElementById('receiptModal').classList.remove('hidden');
+        }
+
+        function sendToWhatsApp() {
+            const t = lastTransaction; if(!t) return;
+            let m = `*ADAMART POS RECEIPT*\nTanggal: ${new Date(t.timestamp).toLocaleString()}\nArea: ${t.area}\n--------------------------------\n`;
+            t.cart.forEach(i => { m += `${i.name} (x${i.quantity}) : ${formatRp(i.price * i.quantity)}\n`; });
+            m += `--------------------------------\n*TOTAL: ${formatRp(t.total)}*\nMetode: ${t.method}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank');
+        }
+
+        document.addEventListener('DOMContentLoaded', ()=> {
             document.getElementById('productSearch').addEventListener('input', filterProducts);
             document.getElementById('productSelect').addEventListener('change', selectProduct);
             loadEvoucherData();
         });
-
-        async function selectArea(area) {
-            currentArea = area;
-            document.getElementById('areaSelection').classList.add('hidden');
-            document.getElementById('loadingScreen').classList.remove('hidden');
-            const checkDb = setInterval(async () => { if (window.db) { clearInterval(checkDb); await loadProducts(); document.getElementById('loadingScreen').classList.add('hidden'); document.getElementById('cashierInterface').classList.remove('hidden'); document.getElementById('currentArea').textContent = `Area: ${area}`; initShift(); } }, 100);
-        }
         
-        async function loadProducts() { try { const q = window.query(window.collection(window.db, "products")); const querySnapshot = await window.getDocs(q); const products = []; querySnapshot.forEach((doc) => { products.push({ id: doc.id, ...doc.data() }); }); const stockKey = `Stok Area Kasir ${currentArea}`; availableProducts = products.filter(p => (p[stockKey] || 0) > 0); populateSelects(); displayProducts(); } catch (e) { console.error("Firebase Error:", e); showToast("Gagal memuat data", true); } }
-        function populateSelects() { const s = document.getElementById('productSelect'); s.innerHTML = '<option value="">Pilih...</option>'; availableProducts.forEach(p => { const opt = document.createElement('option'); opt.value = p.Barcode; opt.textContent = `${p['Nama Produk']} - Rp ${p.Harga}`; s.appendChild(opt); }); }
-        function displayProducts(products = availableProducts) { const k = `Stok Area Kasir ${currentArea}`; document.getElementById('productGrid').innerHTML = products.map(p => `<div class="bg-white p-3 rounded-lg shadow border hover:border-blue-500 transition cursor-pointer" onclick="addToCart('${String(p.Barcode).replace(/'/g, "\\'")}')"><div><h4 class="font-bold text-gray-800 text-sm truncate">${p['Nama Produk']}</h4><div class="flex justify-between items-center mt-2"><span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">${p.Barcode}</span><span class="text-xs font-bold text-gray-500">Stok: ${p[k]}</span></div><p class="text-blue-600 font-bold mt-2 text-sm">Rp ${p.Harga.toLocaleString('id-ID')}</p></div></div>`).join(''); }
-        function filterProducts() { const term = document.getElementById('productSearch').value.toLowerCase(); const filtered = availableProducts.filter(p => String(p['Nama Produk']).toLowerCase().includes(term) || String(p.Barcode).toLowerCase().includes(term)); displayProducts(filtered); }
-        function selectProduct() { const val = document.getElementById('productSelect').value; if(val) { addToCart(val); document.getElementById('productSelect').value = ''; } }
-        function addToCart(barcode) { const product = availableProducts.find(p => String(p.Barcode) == String(barcode)); if (!product) return showToast("Produk error", true); const existing = cart.find(i => String(i.barcode) == String(barcode)); if(existing) existing.quantity++; else cart.push({ barcode: product.Barcode, name: product['Nama Produk'], price: product.Harga, quantity: 1, docId: product.id }); updateCartDisplay(); showToast("Produk masuk"); }
-        function updateCartDisplay() { 
-            const container = document.getElementById('cartItems'); 
-            const totalEl = document.getElementById('totalAmount'); 
-            const btn = document.getElementById('checkoutBtn'); 
-            const evTotal = document.getElementById('evTotalAmountDisplay'); 
-
-            if (!container) return; 
-            
-            let total = 0; 
-            if (cart.length === 0) container.innerHTML = '<div class="text-center text-gray-400 py-4 text-sm">Keranjang Kosong</div>'; 
-            else container.innerHTML = cart.map((item, idx) => { 
-                total += item.price * item.quantity; 
-                return `<div class="flex justify-between items-center bg-gray-50 p-2 rounded text-sm"><div class="flex-1"><div class="font-bold truncate">${item.name}</div><div class="text-xs text-gray-500">Rp ${item.price} x ${item.quantity}</div></div><div class="flex gap-1 items-center"><button onclick="modQty(${idx}, -1)" class="w-5 h-5 bg-red-100 text-red-600 rounded flex items-center justify-center">-</button><span class="font-bold w-6 text-center">${item.quantity}</span><button onclick="modQty(${idx}, 1)" class="w-5 h-5 bg-green-100 text-green-600 rounded flex items-center justify-center">+</button></div></div>`; 
-            }).join(''); 
-            
-            if(totalEl) totalEl.textContent = formatRp(total); 
-            if(btn) btn.disabled = cart.length === 0 || !selectedPaymentMethod; 
-            if(evTotal) evTotal.textContent = formatRp(total); 
-        }
-        function modQty(idx, change) { cart[idx].quantity += change; if(cart[idx].quantity <= 0) cart.splice(idx, 1); updateCartDisplay(); }
-        function showReceipt() { const t = lastTransaction; if(!t) return; let h = `<div class="text-center font-bold">ADAMART</div><div class="text-xs text-center">${new Date().toLocaleString()}</div><hr class="my-2">`; t.cart.forEach(i => h+=`<div class="flex justify-between text-sm"><span>${i.name} x${i.quantity}</span><span>${(i.price*i.quantity).toLocaleString()}</span></div>`); h+=`<hr class="my-2"><div class="flex justify-between font-bold"><span>TOTAL</span><span>${t.total.toLocaleString()}</span></div><div class="flex justify-between text-sm mt-1"><span>Bayar</span><span>${t.method}</span></div>`; if(t.memberNumber) h += `<div class="mt-3 pt-2 border-t border-dashed text-xs"><div class="font-bold">KASBON INFO</div><div>User: ${t.memberNumber}</div></div>`; document.getElementById('receiptContent').innerHTML = h; document.getElementById('receiptModal').classList.remove('hidden'); }
-        function sendToWhatsApp() { const t = lastTransaction; if(!t) return; let m = `*ADAMART POS*\nArea: ${t.area}\nDate: ${new Date().toLocaleString()}\n----------------\n`; t.cart.forEach(i => m+=`${i.name} x${i.quantity}\n`); m+=`Total: ${t.total}`; window.open(`https://wa.me/?text=${encodeURIComponent(m)}`); }
-        
-        // --- ADDED MISSING FUNCTIONS ---
-
-        function clearCart() {
-            if (cart.length === 0) return;
-            if (confirm("Hapus semua item dari keranjang?")) {
-                cart = [];
-                updateCartDisplay();
-                showToast("Keranjang dikosongkan", true);
-            }
-        }
-
-        function changeArea() {
-            if (confirm("Ganti area kerja?")) {
-                location.reload();
-            }
-        }
-
-        function resetTransaction() {
-            cart = [];
-            selectedPaymentMethod = '';
-            // Reset payment buttons
-            document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-700'));
-            const btn = document.getElementById('checkoutBtn');
-            if(btn) {
-                btn.textContent = "Bayar Sekarang";
-                btn.disabled = true;
-            }
-            updateCartDisplay();
-        }
-
-        function showReceivingModal() {
-            alert("Fitur Penerimaan Barang (Receiving) belum aktif di versi ini.");
-        }
-
-        function showRequisitionModal() {
-            alert("Fitur Permintaan Barang (Requisition) belum aktif di versi ini.");
-        }
-
-        // Expose
+        // Expose functions globally for onclick handlers
         window.addToCart = addToCart;
         window.modQty = modQty;
         window.clearCart = clearCart;
@@ -646,9 +800,11 @@
         window.changeArea = changeArea;
         window.checkEvoucherUser = checkEvoucherUser;
         window.processKasbonTransaction = processKasbonTransaction;
-        window.showReceivingModal = showReceivingModal;
-        window.showRequisitionModal = showRequisitionModal;
         window.resetTransaction = resetTransaction;
+        window.showReceivingModal = showReceivingModal;
+        window.closeReceivingModal = closeReceivingModal;
+        window.submitReceiving = submitReceiving;
+        window.filterProducts = filterProducts;
     </script>
 </body>
 </html>
