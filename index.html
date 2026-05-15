@@ -347,16 +347,14 @@
                 <table class="w-full text-sm text-left whitespace-nowrap">
                     <thead class="bg-gray-200 sticky top-0 shadow-sm z-10">
                         <tr>
-                            <th class="p-3">Tanggal</th>
-                            <th class="p-3">Area</th>
                             <th class="p-3">Nama Produk</th>
-                            <th class="p-3 text-center">Qty</th>
-                            <th class="p-3 text-right">Total</th>
-                            <th class="p-3 text-center">Metode</th>
+                            <th class="p-3">Area</th>
+                            <th class="p-3 text-center">Total Terjual (Qty)</th>
+                            <th class="p-3 text-right">Total Pendapatan</th>
                         </tr>
                     </thead>
                     <tbody id="reportTableBody" class="divide-y">
-                        <tr><td colspan="6" class="text-center p-8 text-gray-500">Pilih rentang tanggal lalu klik Tampilkan Data</td></tr>
+                        <tr><td colspan="4" class="text-center p-8 text-gray-500">Pilih rentang tanggal lalu klik Tampilkan Data</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1031,12 +1029,12 @@
             const start = document.getElementById('exportStart').value;
             const end = document.getElementById('exportEnd').value;
             const tbody = document.getElementById('reportTableBody');
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center p-8">⏳ Memuat detail penjualan dari server...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center p-8">⏳ Memuat rekap penjualan item dari server...</td></tr>';
 
             try {
                 const q = window.query(window.collection(window.db, "sales"));
                 const snap = await window.getDocs(q);
-                const data = [];
+                const itemSummary = {};
                 
                 snap.forEach(doc => {
                     const sale = doc.data();
@@ -1047,42 +1045,42 @@
                     if (saleDate >= start && saleDate <= end) {
                         const cart = sale.cart || [];
                         cart.forEach(item => {
-                            data.push({
-                                "Tanggal": saleDate,
-                                "Waktu": new Date(sale.timestamp).toLocaleTimeString(),
-                                "Area": sale.area,
-                                "Nama Produk": item.name,
-                                "Harga Satuan": item.price,
-                                "Qty Terjual": item.quantity,
-                                "Total Harga": item.price * item.quantity,
-                                "Metode Bayar": sale.method || '-'
-                            });
+                            const key = item.name + "_" + sale.area;
+                            if (!itemSummary[key]) {
+                                itemSummary[key] = {
+                                    "Nama Produk": item.name,
+                                    "Area": sale.area,
+                                    "Total Terjual (Qty)": 0,
+                                    "Total Pendapatan": 0
+                                };
+                            }
+                            itemSummary[key]["Total Terjual (Qty)"] += item.quantity;
+                            itemSummary[key]["Total Pendapatan"] += (item.price * item.quantity);
                         });
                     }
                 });
 
-                data.sort((a, b) => new Date(b.Tanggal) - new Date(a.Tanggal));
+                const data = Object.values(itemSummary);
+                data.sort((a, b) => b['Total Terjual (Qty)'] - a['Total Terjual (Qty)']);
                 window.currentReportData = data;
 
                 if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center p-8 text-gray-500">Tidak ada data penjualan di rentang tanggal ini</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center p-8 text-gray-500">Tidak ada item terjual di rentang tanggal ini</td></tr>';
                     document.getElementById('btnDownloadExcel').classList.add('hidden');
                 } else {
                     tbody.innerHTML = data.map(d => `
                         <tr class="hover:bg-blue-50 transition bg-white">
-                            <td class="p-3">${d.Tanggal} <span class="text-xs text-gray-400 block">${d.Waktu}</span></td>
-                            <td class="p-3">${d.Area}</td>
                             <td class="p-3 font-medium whitespace-normal min-w-[200px]">${d['Nama Produk']}</td>
-                            <td class="p-3 text-center font-bold">${d['Qty Terjual']}</td>
-                            <td class="p-3 text-right font-bold text-blue-700">${formatRp(d['Total Harga'])}</td>
-                            <td class="p-3 text-center"><span class="px-2 py-1 bg-gray-100 border rounded text-xs">${d['Metode Bayar']}</span></td>
+                            <td class="p-3">${d.Area}</td>
+                            <td class="p-3 text-center font-bold">${d['Total Terjual (Qty)']}</td>
+                            <td class="p-3 text-right font-bold text-blue-700">${formatRp(d['Total Pendapatan'])}</td>
                         </tr>
                     `).join('');
                     document.getElementById('btnDownloadExcel').classList.remove('hidden');
                 }
             } catch (err) {
                 console.error(err);
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-red-500">Gagal menarik data: ${err.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center p-8 text-red-500">Gagal menarik data: ${err.message}</td></tr>`;
             }
         }
 
