@@ -23,12 +23,11 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // COBA AKTIFKAN OFFLINE PERSISTENCE BAWAAN FIREBASE (Opsional, tapi membantu)
         enableIndexedDbPersistence(db).catch((err) => {
             if (err.code == 'failed-precondition') {
-                console.log('Multiple tabs open, persistence can only be enabled in one tab at a a time.');
+                console.log('Multiple tabs open');
             } else if (err.code == 'unimplemented') {
-                console.log('The current browser does not support all of the features required to enable persistence');
+                console.log('Browser tidak mendukung offline persistence');
             }
         });
         
@@ -43,16 +42,12 @@
         window.where = where;
         window.increment = increment;
         
-        // AUTO LOGIN
         signInAnonymously(auth)
             .then(() => {
-                console.log("Cashier signed in");
                 document.dispatchEvent(new Event('firebase-ready'));
             })
             .catch((error) => {
-                console.error("Auth Failed:", error);
-                // Tetap lanjut jika offline (karena auth mungkin gagal saat offline)
-                 document.dispatchEvent(new Event('firebase-ready'));
+                document.dispatchEvent(new Event('firebase-ready'));
             });
     </script>
 
@@ -68,30 +63,41 @@
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
     
-    <!-- 1. AREA SELECTION -->
     <div id="areaSelection" class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full border-t-4 border-blue-600">
             <div class="text-center mb-8"><div class="text-6xl mb-4">⚡</div><h1 class="text-2xl font-bold text-gray-800 mb-2">Adamart Hybrid</h1><p class="text-gray-600">Mode Hemat Data & Offline</p></div>
             <div class="space-y-4">
-                <button onclick="selectArea('adamart 73')" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 p-4 rounded-xl transition-all flex justify-between items-center border border-blue-200"><div class="flex items-center gap-3"><span class="text-2xl">🏢</span><div class="text-left font-bold">Adamart 73<div class="text-xs font-normal opacity-70">Area Utama</div></div></div><span>→</span></button>
-                <button onclick="selectArea('adamart induksi')" class="w-full bg-green-50 hover:bg-green-100 text-green-700 p-4 rounded-xl transition-all flex justify-between items-center border border-green-200"><div class="flex items-center gap-3"><span class="text-2xl">⚡</span><div class="text-left font-bold">Adamart Induksi<div class="text-xs font-normal opacity-70">Area Induksi</div></div></div><span>→</span></button>
-                <button onclick="selectArea('adamart kelanis')" class="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 p-4 rounded-xl transition-all flex justify-between items-center border border-purple-200"><div class="flex items-center gap-3"><span class="text-2xl">🌟</span><div class="text-left font-bold">Adamart Kelanis<div class="text-xs font-normal opacity-70">Area Kelanis</div></div></div><span>→</span></button>
+                <button onclick="promptPassword('adamart 73')" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 p-4 rounded-xl transition-all flex justify-between items-center border border-blue-200"><div class="flex items-center gap-3"><span class="text-2xl">🏢</span><div class="text-left font-bold">Adamart 73<div class="text-xs font-normal opacity-70">Area Utama</div></div></div><span>→</span></button>
+                <button onclick="promptPassword('adamart induksi')" class="w-full bg-green-50 hover:bg-green-100 text-green-700 p-4 rounded-xl transition-all flex justify-between items-center border border-green-200"><div class="flex items-center gap-3"><span class="text-2xl">⚡</span><div class="text-left font-bold">Adamart Induksi<div class="text-xs font-normal opacity-70">Area Induksi</div></div></div><span>→</span></button>
+                <button onclick="promptPassword('adamart kelanis')" class="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 p-4 rounded-xl transition-all flex justify-between items-center border border-purple-200"><div class="flex items-center gap-3"><span class="text-2xl">🌟</span><div class="text-left font-bold">Adamart Kelanis<div class="text-xs font-normal opacity-70">Area Kelanis</div></div></div><span>→</span></button>
             </div>
             <p class="text-xs text-center text-gray-400 mt-6">Data produk akan disimpan lokal untuk menghemat kuota.</p>
         </div>
     </div>
 
-    <!-- 2. LOADING SCREEN -->
+    <div id="passwordModal" class="hidden fixed inset-0 bg-gray-900/95 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl border border-gray-200">
+            <h2 class="text-2xl font-bold mb-2 text-gray-800">Masukkan PIN Area</h2>
+            <form onsubmit="verifyPassword(event)" class="space-y-4 text-left mt-4">
+                <div>
+                    <input type="password" id="areaPassword" class="w-full p-3 border rounded-lg bg-gray-50 text-center text-2xl tracking-widest focus:bg-white focus:ring-2 focus:ring-blue-500" required placeholder="****">
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closePasswordModal()" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-300">Batal</button>
+                    <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 shadow-lg">Masuk</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="loadingScreen" class="hidden min-h-screen flex items-center justify-center p-4 bg-white/90 z-50 fixed inset-0">
         <div class="text-center"><div class="animate-spin text-4xl mb-4 text-blue-600">⏳</div><h3 class="text-xl font-bold text-gray-800" id="loadingText">Sinkronisasi Data...</h3></div>
     </div>
 
-    <!-- 3. INTERFACE KASIR UTAMA -->
     <div id="cashierInterface" class="hidden flex flex-col h-screen">
         <header class="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-3 shadow-lg shrink-0 transition-colors duration-300" id="mainHeader">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <!-- Indikator Status Koneksi -->
                     <div id="connectionStatus" class="bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-sm">
                         <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span> ONLINE
                     </div>
@@ -102,7 +108,6 @@
                 </div>
                 
                 <div class="flex items-center gap-2">
-                    <!-- Indikator Antrian Offline -->
                     <div id="offlineQueueBadge" class="hidden bg-yellow-500 text-white px-3 py-1 rounded-lg text-xs font-bold cursor-pointer hover:bg-yellow-600 flex items-center gap-2 shadow-lg animate-bounce" onclick="syncOfflineData()">
                         <span>⚠️</span> <span id="offlineCount">0</span> Data Belum Upload
                     </div>
@@ -117,23 +122,28 @@
             </div>
         </header>
 
-        <div class="flex flex-1 overflow-hidden">
-            <!-- Kiri: Produk -->
-            <div class="flex-1 flex flex-col p-4 overflow-hidden bg-gray-100">
-                <div class="bg-white p-3 rounded-lg shadow-sm border border-gray-200 mb-3 flex gap-2">
+        <div class="flex flex-col lg:flex-row flex-1 overflow-hidden relative">
+            <div class="flex-1 flex flex-col p-2 md:p-4 overflow-hidden bg-gray-100">
+                <div class="bg-white p-2 md:p-3 rounded-lg shadow-sm border border-gray-200 mb-3 flex flex-col md:flex-row gap-2">
                     <div class="relative flex-1">
                         <span class="absolute left-3 top-2.5 text-gray-400">🔍</span>
                         <input type="text" id="productSearch" placeholder="Cari nama barang atau scan barcode..." class="w-full pl-9 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
-                    <select id="productSelect" class="w-48 p-2 border rounded-lg text-sm bg-gray-50"><option value="">Manual Input...</option></select>
+                    <select id="productSelect" class="w-full md:w-48 p-2 border rounded-lg text-sm bg-gray-50"><option value="">Manual Input...</option></select>
                 </div>
-                <div id="productGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto pr-1 pb-20 content-start"></div>
+                <div id="productGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 overflow-y-auto pr-1 pb-24 lg:pb-20 content-start"></div>
             </div>
 
-            <!-- Kanan: Keranjang -->
-            <div class="w-96 bg-white shadow-xl flex flex-col border-l border-gray-200 z-20">
+            <button onclick="toggleMobileCart()" id="mobileCartBtn" class="lg:hidden fixed bottom-4 right-4 bg-blue-600 text-white p-4 rounded-full shadow-2xl z-30 flex items-center gap-2 font-bold transform transition active:scale-95">
+                🛒 <span id="mobileCartCount" class="bg-red-500 text-white px-2 py-0.5 rounded-full text-xs">0</span>
+            </button>
+
+            <div id="cartPanel" class="fixed lg:static inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl lg:shadow-xl flex flex-col border-l border-gray-200 z-40 transform translate-x-full lg:translate-x-0 transition-transform duration-300">
                 <div class="p-4 border-b bg-gray-50 flex justify-between items-center shadow-sm">
-                    <h3 class="font-bold text-gray-800 flex items-center gap-2"><span class="text-xl">🛒</span> Keranjang</h3>
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                        <button onclick="toggleMobileCart()" class="lg:hidden mr-2 text-xl hover:bg-gray-200 rounded-full p-1 w-8 h-8 flex items-center justify-center">⬅️</button>
+                        <span class="text-xl">🛒</span> Keranjang
+                    </h3>
                     <button onclick="clearCart()" class="text-red-500 text-xs font-bold hover:underline">Kosongkan</button>
                 </div>
                 <div id="cartItems" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white"></div>
@@ -150,9 +160,6 @@
         </div>
     </div>
 
-    <!-- ================= MODAL - MODAL ================= -->
-
-    <!-- 1. MODAL BUKA SHIFT -->
     <div id="openShiftModal" class="fixed inset-0 bg-gray-900/95 z-[70] flex items-center justify-center p-4 hidden backdrop-blur-sm">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md text-center shadow-2xl border border-gray-200">
             <div class="text-5xl mb-4">☀️</div>
@@ -172,7 +179,6 @@
         </div>
     </div>
 
-    <!-- 2. MODAL TUTUP SHIFT -->
     <div id="closeShiftModal" class="hidden fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
             <h3 class="font-bold text-lg mb-4 border-b pb-2 text-gray-800 flex justify-between"><span>🛑 Laporan Tutup Shift</span><span id="cs-time" class="text-sm font-normal text-gray-500 mt-1"></span></h3>
@@ -201,7 +207,6 @@
         </div>
     </div>
 
-    <!-- 3. MODAL KASBON -->
     <div id="kasbonModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-xl p-6 w-full max-w-md relative shadow-2xl">
             <div class="flex justify-between items-center mb-4">
@@ -235,10 +240,8 @@
         </div>
     </div>
 
-    <!-- 4. MODAL RECEIVING (KHUSUS PO MANAGER - STRICT & ROBUST) -->
     <div id="receivingModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-xl p-0 w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <!-- Header Modal -->
             <div class="p-4 border-b bg-purple-50 flex justify-between items-center">
                 <div>
                     <h3 class="font-bold text-lg text-purple-800 flex items-center gap-2">
@@ -249,9 +252,8 @@
                 <button onclick="closeReceivingModal()" class="text-gray-400 hover:text-red-500 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-purple-100">×</button>
             </div>
             
-            <div class="flex flex-1 overflow-hidden">
-                <!-- Sidebar: List PO Pending -->
-                <div class="w-1/4 border-r bg-gray-50 flex flex-col">
+            <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
+                <div class="w-full md:w-1/4 border-b md:border-b-0 md:border-r bg-gray-50 flex flex-col h-1/3 md:h-auto">
                     <div class="p-3 border-b bg-gray-100 font-bold text-xs text-gray-500 uppercase tracking-wide">
                         Daftar Surat Jalan
                     </div>
@@ -260,9 +262,7 @@
                     </div>
                 </div>
 
-                <!-- Main: Detail Barang QC -->
                 <div class="flex-1 flex flex-col bg-white">
-                    <!-- PO Info Header -->
                     <div id="poDetailHeader" class="p-4 border-b bg-white hidden">
                         <div class="flex justify-between items-start">
                             <div>
@@ -276,13 +276,11 @@
                         </div>
                     </div>
 
-                    <!-- Placeholder -->
                     <div id="poPlaceholder" class="flex-1 flex flex-col items-center justify-center text-gray-400">
                         <div class="text-5xl mb-4">⬅️</div>
                         <p>Pilih Surat Jalan di sebelah kiri</p>
                     </div>
 
-                    <!-- List Barang (QC Table) -->
                     <div id="poItemsContainer" class="flex-1 overflow-y-auto p-0 hidden">
                         <table class="w-full text-sm">
                             <thead class="bg-gray-100 text-gray-600 text-xs uppercase sticky top-0 z-10 shadow-sm">
@@ -298,7 +296,6 @@
                         </table>
                     </div>
 
-                    <!-- Footer Action -->
                     <div id="poFooter" class="p-4 border-t bg-gray-50 hidden">
                         <div class="mb-3">
                             <label class="block text-xs font-bold text-gray-500 mb-1">Catatan Penerimaan (Opsional)</label>
@@ -310,7 +307,7 @@
                             </div>
                             <span class="font-bold text-lg text-purple-700">Total Terima: <span id="recvTotalItems">0</span> Item</span>
                         </div>
-                        <button id="btnSubmitRecv" onclick="submitReceiving()" class="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 shadow-lg transition transform active:scale-95">
+                        <button id="btnSubmitRecv" onclick="confirmSubmitReceiving()" class="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 shadow-lg transition transform active:scale-95">
                             ✅ Konfirmasi & Simpan Stok
                         </button>
                     </div>
@@ -319,9 +316,19 @@
         </div>
     </div>
 
-    <!-- Modal Receipt & Toast -->
     <div id="receiptModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl transform transition-all scale-100"><div class="text-center mb-4"><div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-2"><span class="text-2xl text-green-600">✓</span></div><h3 class="text-lg leading-6 font-medium text-gray-900">Transaksi Berhasil</h3></div><div id="receiptContent" class="bg-gray-50 p-4 rounded-lg text-sm mb-4 font-mono border border-gray-200"></div><div class="flex gap-3"><button onclick="closeReceiptModal()" class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium">Tutup</button><button onclick="sendToWhatsApp()" class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow">Kirim WA</button></div></div></div>
-    <div id="toast" class="hidden fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl z-[80] animate-bounce flex items-center gap-2"><span>✅</span><span id="toastMsg">Notification</span></div>
+    
+    <div id="toast" class="hidden fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl z-[80] flex items-center gap-2"><span>✅</span><span id="toastMsg">Notification</span></div>
+
+    <div id="customConfirm" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-xl p-6 w-full max-w-sm shadow-2xl text-center">
+            <h3 id="confirmMsg" class="font-bold text-lg mb-4 text-gray-800">Konfirmasi</h3>
+            <div class="flex gap-3">
+                <button id="btnConfirmCancel" class="flex-1 py-2 bg-gray-200 rounded-lg text-gray-700 font-bold hover:bg-gray-300">Batal</button>
+                <button id="btnConfirmOk" class="flex-1 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">Ya</button>
+            </div>
+        </div>
+    </div>
     
     <script>
         const POS_API_URL = 'https://script.google.com/macros/s/AKfycbwkZVsoGXdgxck4xwOXk2fW4Oawn6diXu2bUX0sAIRFCfGeS1jTr6QjEH6Fr6-RFbnDAw/exec';
@@ -332,11 +339,16 @@
         let receivingCart = [], activePO = null; 
         let isOffline = false;
         
-        // CACHE & QUEUE
         window.cachedPOs = {}; 
         window.allProducts = [];
-        
-        // DETEKSI KONEKSI
+
+        const areaPasswords = {
+            'adamart 73': '1234',
+            'adamart kelanis': '4321',
+            'adamart induksi': '5678'
+        };
+        let pendingArea = '';
+
         window.addEventListener('online',  updateOnlineStatus);
         window.addEventListener('offline', updateOnlineStatus);
 
@@ -348,7 +360,7 @@
             if(isOffline) {
                 statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-white"></span> OFFLINE MODE';
                 statusEl.className = 'bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-sm';
-                header.className = 'bg-gray-800 text-white p-3 shadow-lg shrink-0 transition-colors duration-300'; // Dark mode when offline
+                header.className = 'bg-gray-800 text-white p-3 shadow-lg shrink-0 transition-colors duration-300';
                 showToast("Mode Offline Aktif. Data disimpan lokal.", true);
             } else {
                 statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-white animate-pulse"></span> ONLINE';
@@ -363,12 +375,48 @@
         function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
             document.getElementById('toastMsg').textContent = msg;
-            t.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-xl z-[80] animate-bounce flex items-center gap-2 ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
+            t.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-xl z-[80] flex items-center gap-2 ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
             t.classList.remove('hidden');
             setTimeout(() => t.classList.add('hidden'), 3000);
         }
 
-        // --- SHIFT LOGIC ---
+        let confirmAction = null;
+        function showConfirm(msg, action) {
+            document.getElementById('confirmMsg').textContent = msg;
+            confirmAction = action;
+            document.getElementById('customConfirm').classList.remove('hidden');
+        }
+        document.getElementById('btnConfirmCancel').onclick = () => {
+            document.getElementById('customConfirm').classList.add('hidden');
+            confirmAction = null;
+        };
+        document.getElementById('btnConfirmOk').onclick = () => {
+            document.getElementById('customConfirm').classList.add('hidden');
+            if(confirmAction) confirmAction();
+        };
+
+        function promptPassword(area) {
+            pendingArea = area;
+            document.getElementById('passwordModal').classList.remove('hidden');
+            document.getElementById('areaPassword').value = '';
+            document.getElementById('areaPassword').focus();
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').classList.add('hidden');
+        }
+
+        function verifyPassword(event) {
+            event.preventDefault();
+            const input = document.getElementById('areaPassword').value;
+            if (input === areaPasswords[pendingArea]) {
+                document.getElementById('passwordModal').classList.add('hidden');
+                selectArea(pendingArea);
+            } else {
+                showToast("PIN salah", true);
+            }
+        }
+
         function initShift() {
             const saved = localStorage.getItem('adamart_shift');
             if (saved) {
@@ -383,21 +431,17 @@
             e.preventDefault();
             const name = document.getElementById('shiftCashier').value;
             const cash = parseInt(document.getElementById('startCash').value);
-            if(!name || isNaN(cash)) return alert("Data tidak valid");
+            if(!name || isNaN(cash)) return showToast("Data tidak valid", true);
             const data = { id: 'SHIFT-'+Date.now(), cashierName: name, startCash: cash, startTime: new Date().toISOString(), area: currentArea };
             localStorage.setItem('adamart_shift', JSON.stringify(data));
             activeShift = data;
             initShift(); showToast(`Shift dibuka: ${name}`);
         }
         async function closeShiftModal() {
-            // Hitung dari data lokal dulu jika offline, atau query jika online (untuk simplifikasi, kita ambil local accumulation jika memungkinkan, tapi di sini kita query DB karena asumsi shift closing butuh data akurat)
-            // Note: Dalam mode offline sejati, kita harus hitung dari localStorage transaksi hari ini.
-            
-            if(!activeShift) return alert("Shift belum aktif");
+            if(!activeShift) return showToast("Shift belum aktif", true);
             
             let cash=0, qris=0, kasbon=0;
 
-            // Cek Offline Queue juga
             const pending = JSON.parse(localStorage.getItem('adamart_pending_tx') || '[]');
             pending.forEach(d => {
                  if(d.shiftId === activeShift.id) {
@@ -405,14 +449,12 @@
                  }
             });
 
-            // Jika online, ambil dari server juga (opsional, tapi idealnya data server + lokal yg belum sync)
-            // Untuk simplifikasi "Hemat Kuota", kita asumsikan kasir sync dulu sebelum tutup shift
             if(navigator.onLine) {
                 const q = window.query(window.collection(window.db, "sales"), window.where("shiftId", "==", activeShift.id));
                 const snap = await window.getDocs(q);
                 snap.forEach(d => { const v=d.data(); if(v.method==='Tunai') cash+=v.total; else if(v.method==='QRIS') qris+=v.total; else kasbon+=v.total; });
             } else {
-                alert("Mode Offline: Data tutup shift mungkin tidak 100% akurat jika ada transaksi server lain. Harap sync dulu.");
+                showToast("Mode Offline: Data tutup shift mungkin tidak akurat", true);
             }
             
             document.getElementById('cs-name').textContent = activeShift.cashierName;
@@ -443,18 +485,16 @@
                 try {
                     await window.addDoc(window.collection(window.db, "shifts"), rep);
                     fetch(POS_API_URL, { method: 'POST', body: JSON.stringify({action: 'record_shift', data: rep}) });
-                    alert("Shift Ditutup & Terupload.");
-                } catch(e) { alert("Gagal upload: "+e.message); }
+                    showToast("Shift Ditutup & Terupload.");
+                } catch(e) { showToast("Gagal upload: "+e.message, true); }
             } else {
-                // Simpan lokal jika offline (Implementasi sederhana: alert user)
-                alert("Shift Ditutup (Offline). Data disimpan di HP, laporan manual ke Manager.");
+                showToast("Shift Ditutup (Offline). Data disimpan lokal.", true);
             }
             
             localStorage.removeItem('adamart_shift'); activeShift = null;
-            location.reload();
+            setTimeout(() => { location.reload(); }, 1500);
         }
 
-        // --- PAYMENT & E-VOUCHER ---
         function selectPaymentMethod(m) {
             selectedPaymentMethod = m;
             document.querySelectorAll('.payment-btn').forEach(b => b.className = 'payment-btn bg-white border border-gray-300 p-2 rounded-lg text-xs font-bold hover:bg-blue-50 transition text-gray-600');
@@ -509,9 +549,8 @@
             });
         }
 
-        // --- CORE TRANSACTION LOGIC (OFFLINE FIRST) ---
         async function executeTransaction(ex={}) {
-            if(!activeShift) return alert("Buka Shift dulu");
+            if(!activeShift) return showToast("Buka Shift dulu", true);
             
             const tot = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
             const d = { 
@@ -519,15 +558,10 @@
                 total: tot, method: selectedPaymentMethod, cart: cart, ...ex, timestamp: new Date().toISOString()
             };
 
-            // OFFLINE FIRST STRATEGY
             if (!navigator.onLine) {
-                // 1. Save to Queue
                 const pending = JSON.parse(localStorage.getItem('adamart_pending_tx') || '[]');
                 pending.push(d);
                 localStorage.setItem('adamart_pending_tx', JSON.stringify(pending));
-                
-                // 2. Update Local Stock (Visual Only) - Optional but good UX
-                // Kita tidak update 'availableProducts' permanen di sini karena kompleks, cukup visual reset cart.
                 
                 lastTransaction = d; 
                 showReceipt(); 
@@ -537,7 +571,6 @@
                 return;
             }
 
-            // ONLINE STRATEGY
             try {
                 await window.addDoc(window.collection(window.db,"sales"), d);
                 for(const i of cart) {
@@ -547,7 +580,6 @@
                 lastTransaction=d; showReceipt(); resetTransaction(); showToast("Transaksi Berhasil"); loadProducts();
             } catch(e) { 
                 console.error(e);
-                // Fallback to offline if error
                 const pending = JSON.parse(localStorage.getItem('adamart_pending_tx') || '[]');
                 pending.push(d);
                 localStorage.setItem('adamart_pending_tx', JSON.stringify(pending));
@@ -557,12 +589,11 @@
             }
         }
 
-        // --- SYNC MECHANISM ---
         async function syncOfflineData() {
             const pending = JSON.parse(localStorage.getItem('adamart_pending_tx') || '[]');
             if(pending.length === 0) return;
             
-            if(!navigator.onLine) return alert("Masih Offline. Cari sinyal dulu.");
+            if(!navigator.onLine) return showToast("Masih Offline. Cari sinyal dulu.", true);
             
             const badge = document.getElementById('offlineQueueBadge');
             badge.innerHTML = `⏳ Mengupload ${pending.length} data...`;
@@ -573,9 +604,7 @@
             for (const d of pending) {
                 try {
                     await window.addDoc(window.collection(window.db,"sales"), d);
-                    // Update stock juga (agak tricky karena id mungkin berubah jika produk diedit di server, tapi asumsi ID tetap)
                     for(const i of d.cart) {
-                        // Cek apakah docId valid
                          if(i.docId) {
                              await window.updateDoc(window.doc(window.db,"products",i.docId), {[`Stok Area Kasir ${d.area}`]: window.increment(-i.quantity)});
                          }
@@ -584,7 +613,7 @@
                     successCount++;
                 } catch (e) {
                     console.error("Sync failed for item:", e);
-                    newPending.push(d); // Keep failed items
+                    newPending.push(d); 
                 }
             }
 
@@ -592,10 +621,10 @@
             updateOfflineBadge();
             
             if(successCount > 0) {
-                alert(`Berhasil upload ${successCount} transaksi!`);
-                loadProducts(); // Refresh stok terbaru dari server
+                showToast(`Berhasil upload ${successCount} transaksi!`);
+                loadProducts(); 
             }
-            if(newPending.length > 0) alert(`Gagal upload ${newPending.length} transaksi. Coba lagi nanti.`);
+            if(newPending.length > 0) showToast(`Gagal upload ${newPending.length} transaksi. Coba lagi nanti.`, true);
         }
 
         function updateOfflineBadge() {
@@ -611,9 +640,8 @@
             }
         }
 
-        // --- LOGISTIK: RECEIVING ---
         function showReceivingModal() {
-            if (!navigator.onLine) return alert("Fitur Terima Barang butuh koneksi internet untuk update stok server.");
+            if (!navigator.onLine) return showToast("Butuh koneksi internet untuk fitur ini.", true);
             
             activePO = null; receivingCart = []; 
             document.getElementById('poDetailHeader').classList.add('hidden');
@@ -665,7 +693,7 @@
                     document.getElementById('poItemsContainer').classList.remove('hidden');
                     document.getElementById('poFooter').classList.remove('hidden');
                     renderReceiving();
-                } catch(e) { alert("Data PO korup: " + e.message); }
+                } catch(e) { showToast("Data PO korup: " + e.message, true); }
             });
         };
 
@@ -706,13 +734,14 @@
             document.getElementById('recvTotalItems').textContent = totalGood;
         }
 
-        async function submitReceiving() {
+        function confirmSubmitReceiving() {
             if(!activePO || receivingCart.length===0) return;
             const totalGood = receivingCart.reduce((s,i) => s + (i.condition==='Baik' ? i.receivedQty : 0), 0);
+            showConfirm(`Konfirmasi penerimaan?\nTotal Stok Layak Jual: ${totalGood}`, submitReceiving);
+        }
+
+        async function submitReceiving() {
             const note = document.getElementById('receivingNote').value;
-            
-            if(!confirm(`Konfirmasi penerimaan? \nTotal Stok Layak Jual Bertambah: ${totalGood}`)) return;
-            
             const btn = document.getElementById('btnSubmitRecv');
             const originalText = btn.textContent;
             btn.disabled = true;
@@ -755,7 +784,7 @@
                 }
 
                 if (failures.length > 0) {
-                    alert("Beberapa barang gagal disimpan: " + failures.join(", "));
+                    showToast("Beberapa barang gagal disimpan", true);
                 } else {
                     const log = {
                         logId: "RCV-"+Date.now(), type: "RECEIVING", area: currentArea,
@@ -775,29 +804,33 @@
                         receivingNote: note
                     });
                     fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_receiving', data:log})});
-                    alert("✅ Barang Diterima & Stok Berhasil Diupdate!");
+                    showToast("Barang Diterima & Stok Berhasil Diupdate!");
                     closeReceivingModal(); 
                     loadProducts(); 
                 }
 
             } catch(e) { 
                 console.error(e);
-                alert("Gagal proses Global: "+e.message); 
+                showToast("Gagal proses Global: "+e.message, true); 
             } finally {
                 btn.disabled = false;
                 btn.textContent = originalText;
             }
         }
 
-        // --- CORE UI ---
-        function clearCart() { if(cart.length && confirm("Hapus?")) { cart=[]; updateCartDisplay(); } }
-        function changeArea() { if(confirm("Ganti Area?")) location.reload(); }
+        function clearCart() { 
+            if(cart.length) { 
+                showConfirm("Kosongkan keranjang?", () => { 
+                    cart=[]; updateCartDisplay(); 
+                }); 
+            } 
+        }
+        function changeArea() { showConfirm("Ganti Area?", () => { location.reload(); }); }
         function resetTransaction() { cart=[]; selectedPaymentMethod=''; document.getElementById('checkoutBtn').disabled=true; document.getElementById('checkoutBtn').textContent="PROSES PEMBAYARAN"; updateCartDisplay(); document.querySelectorAll('.payment-btn').forEach(b=>b.className='payment-btn bg-white border border-gray-300 p-2 rounded-lg text-xs font-bold text-gray-600'); }
         function closeReceivingModal() { document.getElementById('receivingModal').classList.add('hidden'); }
         function closeReceiptModal() { document.getElementById('receiptModal').classList.add('hidden'); }
         function closeKasbonModal() { document.getElementById('kasbonModal').classList.add('hidden'); }
 
-        // --- DATA LOADING & CACHE ---
         function forceRefreshData() {
             localStorage.removeItem(`adamart_products_${currentArea}`);
             loadProducts();
@@ -805,7 +838,6 @@
 
         async function selectArea(area) {
             currentArea = area; document.getElementById('areaSelection').classList.add('hidden'); document.getElementById('loadingScreen').classList.remove('hidden');
-            // Check offline pending count
             updateOfflineBadge();
             
             const c = setInterval(async()=>{if(window.db){clearInterval(c);await loadProducts();document.getElementById('loadingScreen').classList.add('hidden');document.getElementById('cashierInterface').classList.remove('hidden');document.getElementById('currentArea').textContent=area;initShift();}},100);
@@ -816,13 +848,10 @@
             loadingText.textContent = "Memuat Data Produk...";
             
             try {
-                // 1. Cek Cache Lokal
                 const cacheKey = `adamart_products_${currentArea}`;
                 const cached = localStorage.getItem(cacheKey);
                 
                 if (cached && !navigator.onLine) {
-                    // Offline mode: Load from cache
-                    console.log("Loading products from cache");
                     const parsed = JSON.parse(cached);
                     window.allProducts = parsed;
                     availableProducts = parsed.filter(p => (p[`Stok Area Kasir ${currentArea}`] || 0) > 0);
@@ -830,14 +859,12 @@
                     return;
                 }
 
-                // 2. Online mode: Fetch Fresh
                 if (navigator.onLine) {
                     const q = window.query(window.collection(window.db, "products"));
                     const querySnapshot = await window.getDocs(q);
                     const products = [];
                     querySnapshot.forEach((doc) => { products.push({ id: doc.id, ...doc.data() }); });
                     
-                    // Save to Cache
                     localStorage.setItem(cacheKey, JSON.stringify(products));
                     window.allProducts = products;
                     
@@ -846,7 +873,7 @@
                     populateSelects(); displayProducts();
                 }
             } catch (e) {
-                console.error("Firebase Error:", e); showToast("Gagal memuat data produk (Mode Offline)", true);
+                console.error("Firebase Error:", e); showToast("Gagal memuat data produk", true);
             }
         }
 
@@ -912,6 +939,17 @@
                 else if(!selectedPaymentMethod) checkoutBtn.textContent = "PILIH METODE BAYAR";
                 else checkoutBtn.textContent = `BAYAR ${formatRp(total)}`;
             }
+
+            const mobileBadge = document.getElementById('mobileCartCount');
+            if(mobileBadge) {
+                const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+                mobileBadge.textContent = totalItems;
+            }
+        }
+
+        function toggleMobileCart() {
+            const panel = document.getElementById('cartPanel');
+            if(panel) panel.classList.toggle('translate-x-full');
         }
 
         function modQty(idx, change) {
@@ -945,6 +983,9 @@
             updateOfflineBadge();
         });
         
+        window.promptPassword = promptPassword;
+        window.closePasswordModal = closePasswordModal;
+        window.verifyPassword = verifyPassword;
         window.addToCart = addToCart;
         window.modQty = modQty;
         window.clearCart = clearCart;
@@ -967,6 +1008,7 @@
         window.filterProducts = filterProducts;
         window.forceRefreshData = forceRefreshData;
         window.syncOfflineData = syncOfflineData;
+        window.toggleMobileCart = toggleMobileCart;
     </script>
 </body>
 </html>
