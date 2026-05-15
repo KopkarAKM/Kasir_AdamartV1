@@ -333,22 +333,37 @@
     </div>
 
     <div id="exportModal" class="hidden fixed inset-0 bg-black/50 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 class="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2"><span>📊</span> Ekspor Laporan Shift</h3>
-            <form onsubmit="exportToExcel(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Tanggal Mulai</label>
-                    <input type="date" id="exportStart" class="w-full p-2 border rounded bg-gray-50 focus:bg-white" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Tanggal Akhir</label>
-                    <input type="date" id="exportEnd" class="w-full p-2 border rounded bg-gray-50 focus:bg-white" required>
-                </div>
-                <div class="flex gap-2 pt-2">
-                    <button type="button" onclick="closeExportModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-bold hover:bg-gray-300">Batal</button>
-                    <button type="submit" class="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700 shadow">Unduh Excel</button>
-                </div>
-            </form>
+        <div class="bg-white rounded-xl p-6 w-full max-w-4xl shadow-2xl flex flex-col h-[80vh]">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg text-gray-800 flex items-center gap-2"><span>📊</span> Laporan Shift</h3>
+                <button onclick="closeExportModal()" class="text-gray-500 hover:text-red-500 font-bold text-xl">×</button>
+            </div>
+            <div class="flex flex-col md:flex-row gap-2 mb-4">
+                <input type="date" id="exportStart" class="p-2 border rounded text-sm flex-1 bg-gray-50">
+                <input type="date" id="exportEnd" class="p-2 border rounded text-sm flex-1 bg-gray-50">
+                <button onclick="fetchReportData()" class="bg-blue-600 text-white px-6 py-2 rounded font-bold hover:bg-blue-700 shadow">Tampilkan Data</button>
+            </div>
+            <div class="flex-1 overflow-auto bg-gray-50 border rounded mb-4 shadow-inner">
+                <table class="w-full text-sm text-left whitespace-nowrap">
+                    <thead class="bg-gray-200 sticky top-0 shadow-sm z-10">
+                        <tr>
+                            <th class="p-3">Tanggal</th>
+                            <th class="p-3">Kasir</th>
+                            <th class="p-3">Area</th>
+                            <th class="p-3 text-right">Penjualan Sistem</th>
+                            <th class="p-3 text-right">Uang Fisik</th>
+                            <th class="p-3 text-right">Selisih</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody" class="divide-y">
+                        <tr><td colspan="6" class="text-center p-8 text-gray-500">Pilih rentang tanggal lalu klik Tampilkan Data</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex gap-3 justify-end">
+                <button onclick="copyReportData()" class="bg-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-bold hover:bg-gray-300">Salin Teks</button>
+                <button onclick="downloadExcelReport()" id="btnDownloadExcel" class="bg-green-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-green-700 shadow hidden">Unduh Excel</button>
+            </div>
         </div>
     </div>
     
@@ -1001,6 +1016,9 @@
         function openExportModal() {
             document.getElementById('exportStart').value = new Date().toISOString().split('T')[0];
             document.getElementById('exportEnd').value = new Date().toISOString().split('T')[0];
+            document.getElementById('reportTableBody').innerHTML = '<tr><td colspan="6" class="text-center p-8 text-gray-500">Pilih rentang tanggal lalu klik Tampilkan Data</td></tr>';
+            document.getElementById('btnDownloadExcel').classList.add('hidden');
+            window.currentReportData = [];
             document.getElementById('exportModal').classList.remove('hidden');
         }
 
@@ -1008,18 +1026,12 @@
             document.getElementById('exportModal').classList.add('hidden');
         }
 
-        async function exportToExcel(e) {
-            e.preventDefault();
-            if (!navigator.onLine) {
-                showToast("Harus online untuk unduh laporan", true);
-                return;
-            }
+        async function fetchReportData() {
+            if (!navigator.onLine) return showToast("Harus online untuk menarik laporan", true);
             const start = document.getElementById('exportStart').value;
             const end = document.getElementById('exportEnd').value;
-            const btn = e.target.querySelector('button[type="submit"]');
-            const oriText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = "Mengunduh...";
+            const tbody = document.getElementById('reportTableBody');
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center p-8">⏳ Memuat data dari server...</td></tr>';
 
             try {
                 const q = window.query(window.collection(window.db, "shifts"));
@@ -1030,7 +1042,6 @@
                     const dDate = d.closeTime ? d.closeTime.split('T')[0] : (d.openTime ? d.openTime.split('T')[0] : '');
                     if (dDate >= start && dDate <= end) {
                         data.push({
-                            "ID Shift": doc.id,
                             "Tanggal": dDate,
                             "Waktu Buka": d.openTime ? new Date(d.openTime).toLocaleTimeString() : '-',
                             "Waktu Tutup": d.closeTime ? new Date(d.closeTime).toLocaleTimeString() : '-',
@@ -1046,23 +1057,63 @@
                     }
                 });
 
+                window.currentReportData = data;
+
                 if (data.length === 0) {
-                    showToast("Tidak ada data", true);
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center p-8 text-gray-500">Tidak ada data shift di rentang tanggal ini</td></tr>';
+                    document.getElementById('btnDownloadExcel').classList.add('hidden');
                 } else {
-                    const ws = XLSX.utils.json_to_sheet(data);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Rekap Shift");
-                    XLSX.writeFile(wb, `Rekap_Shift_${start}_sd_${end}.xlsx`);
-                    showToast("Laporan berhasil diunduh");
-                    closeExportModal();
+                    tbody.innerHTML = data.map(d => `
+                        <tr class="hover:bg-blue-50 transition bg-white">
+                            <td class="p-3">${d.Tanggal}</td>
+                            <td class="p-3 font-medium">${d.Kasir}</td>
+                            <td class="p-3">${d.Area}</td>
+                            <td class="p-3 text-right">${formatRp(d['Tunai Sistem'])}</td>
+                            <td class="p-3 text-right font-bold text-blue-700">${formatRp(d['Uang Fisik'])}</td>
+                            <td class="p-3 text-right font-bold ${d.Selisih < 0 ? 'text-red-600' : 'text-green-600'}">${formatRp(d.Selisih)}</td>
+                        </tr>
+                    `).join('');
+                    document.getElementById('btnDownloadExcel').classList.remove('hidden');
                 }
             } catch (err) {
                 console.error(err);
-                showToast("Gagal mengunduh", true);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = oriText;
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-red-500">Gagal menarik data: ${err.message}</td></tr>`;
             }
+        }
+
+        function downloadExcelReport() {
+            if(!window.currentReportData || window.currentReportData.length === 0) return;
+            try {
+                const ws = XLSX.utils.json_to_sheet(window.currentReportData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Rekap Shift");
+                XLSX.writeFile(wb, `Rekap_Shift.xlsx`);
+                showToast("Laporan berhasil diunduh");
+            } catch(e) {
+                showToast("Gagal membuat Excel: " + e.message, true);
+            }
+        }
+
+        function copyReportData() {
+            if(!window.currentReportData || window.currentReportData.length === 0) return showToast("Tidak ada data untuk disalin", true);
+            
+            // Format data menjadi string yang bisa dipaste di Spreadsheet (Tab separated)
+            const headers = Object.keys(window.currentReportData[0]).join('\t');
+            const rows = window.currentReportData.map(obj => Object.values(obj).join('\t')).join('\n');
+            const text = headers + '\n' + rows;
+            
+            // Bypass metode lama agar tidak dicegat oleh pengaturan keamanan browser
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast("Data berhasil disalin! Silakan Paste di Excel/Spreadsheet");
+            } catch (err) {
+                showToast("Gagal menyalin teks", true);
+            }
+            document.body.removeChild(textarea);
         }
 
         document.addEventListener('DOMContentLoaded', ()=> {
@@ -1100,7 +1151,9 @@
         window.toggleMobileCart = toggleMobileCart;
         window.openExportModal = openExportModal;
         window.closeExportModal = closeExportModal;
-        window.exportToExcel = exportToExcel;
+        window.fetchReportData = fetchReportData;
+        window.downloadExcelReport = downloadExcelReport;
+        window.copyReportData = copyReportData;
     </script>
 </body>
 </html>
