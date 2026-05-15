@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Adamart - Kasir Offline First</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, getDocs, addDoc, updateDoc, setDoc, doc, query, where, increment, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -116,6 +117,7 @@
                         Kasir: <span id="headerCashierName" class="font-bold text-yellow-300">-</span>
                     </div>
                     
+                    <button onclick="openExportModal()" class="bg-green-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-green-500 flex items-center gap-1 shadow-sm border border-green-400"><span>📊</span> Laporan</button>
                     <button onclick="showReceivingModal()" class="bg-purple-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-purple-500 flex items-center gap-1 shadow-sm border border-purple-400"><span>📦</span> Cek PO</button>
                     <button onclick="closeShiftModal()" class="bg-red-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-500 border border-red-400 shadow-sm">🛑 Tutup</button>
                 </div>
@@ -327,6 +329,26 @@
                 <button id="btnConfirmCancel" class="flex-1 py-2 bg-gray-200 rounded-lg text-gray-700 font-bold hover:bg-gray-300">Batal</button>
                 <button id="btnConfirmOk" class="flex-1 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">Ya</button>
             </div>
+        </div>
+    </div>
+
+    <div id="exportModal" class="hidden fixed inset-0 bg-black/50 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 class="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2"><span>📊</span> Ekspor Laporan Shift</h3>
+            <form onsubmit="exportToExcel(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Tanggal Mulai</label>
+                    <input type="date" id="exportStart" class="w-full p-2 border rounded bg-gray-50 focus:bg-white" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Tanggal Akhir</label>
+                    <input type="date" id="exportEnd" class="w-full p-2 border rounded bg-gray-50 focus:bg-white" required>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="closeExportModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-bold hover:bg-gray-300">Batal</button>
+                    <button type="submit" class="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700 shadow">Unduh Excel</button>
+                </div>
+            </form>
         </div>
     </div>
     
@@ -976,6 +998,73 @@
             window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank');
         }
 
+        function openExportModal() {
+            document.getElementById('exportStart').value = new Date().toISOString().split('T')[0];
+            document.getElementById('exportEnd').value = new Date().toISOString().split('T')[0];
+            document.getElementById('exportModal').classList.remove('hidden');
+        }
+
+        function closeExportModal() {
+            document.getElementById('exportModal').classList.add('hidden');
+        }
+
+        async function exportToExcel(e) {
+            e.preventDefault();
+            if (!navigator.onLine) {
+                showToast("Harus online untuk unduh laporan", true);
+                return;
+            }
+            const start = document.getElementById('exportStart').value;
+            const end = document.getElementById('exportEnd').value;
+            const btn = e.target.querySelector('button[type="submit"]');
+            const oriText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = "Mengunduh...";
+
+            try {
+                const q = window.query(window.collection(window.db, "shifts"));
+                const snap = await window.getDocs(q);
+                const data = [];
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const dDate = d.closeTime ? d.closeTime.split('T')[0] : (d.openTime ? d.openTime.split('T')[0] : '');
+                    if (dDate >= start && dDate <= end) {
+                        data.push({
+                            "ID Shift": doc.id,
+                            "Tanggal": dDate,
+                            "Waktu Buka": d.openTime ? new Date(d.openTime).toLocaleTimeString() : '-',
+                            "Waktu Tutup": d.closeTime ? new Date(d.closeTime).toLocaleTimeString() : '-',
+                            "Kasir": d.cashierName,
+                            "Area": d.area,
+                            "Modal Awal": d.startCash || 0,
+                            "Tunai Sistem": d.expectedCashSales || 0,
+                            "Total QRIS": d.totalQris || 0,
+                            "Total Kasbon": d.totalKasbon || 0,
+                            "Uang Fisik": d.actualCash || 0,
+                            "Selisih": d.difference || 0
+                        });
+                    }
+                });
+
+                if (data.length === 0) {
+                    showToast("Tidak ada data", true);
+                } else {
+                    const ws = XLSX.utils.json_to_sheet(data);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Rekap Shift");
+                    XLSX.writeFile(wb, `Rekap_Shift_${start}_sd_${end}.xlsx`);
+                    showToast("Laporan berhasil diunduh");
+                    closeExportModal();
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("Gagal mengunduh", true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = oriText;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', ()=> {
             document.getElementById('productSearch').addEventListener('input', filterProducts);
             document.getElementById('productSelect').addEventListener('change', selectProduct);
@@ -1009,6 +1098,9 @@
         window.forceRefreshData = forceRefreshData;
         window.syncOfflineData = syncOfflineData;
         window.toggleMobileCart = toggleMobileCart;
+        window.openExportModal = openExportModal;
+        window.closeExportModal = closeExportModal;
+        window.exportToExcel = exportToExcel;
     </script>
 </body>
 </html>
