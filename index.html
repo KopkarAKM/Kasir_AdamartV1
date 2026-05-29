@@ -512,6 +512,9 @@
     <script>
         const POS_API_URL = 'https://script.google.com/macros/s/AKfycbwkZVsoGXdgxck4xwOXk2fW4Oawn6diXu2bUX0sAIRFCfGeS1jTr6QjEH6Fr6-RFbnDAw/exec';
         const EVOUCHER_API_URL = "https://script.google.com/macros/s/AKfycbyQFkZW0QuBXi082jgXTsVBIy1OfVfhaQYVogvr7uBJBrCuGtkM73tTGqA1dl9ThlfL/exec";
+        
+        // Konstanta baru untuk API Google Sheet transaksi tambahan
+        const NEW_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwoW8zffXN_A1Z3y5SiVknDSO62s5ZBnYu7WQpu00ak-kDeH5PPsZZAg_-vXHGlknjR/exec";
 
         let currentArea = '', availableProducts = [], cart = [], selectedPaymentMethod = '', lastTransaction = null;
         let activeShift = null, evoucherUsers = [];
@@ -772,7 +775,26 @@
                 for(const i of cart) {
                     await window.updateDoc(window.doc(window.db,"products",i.docId), {[`Stok Area Kasir ${currentArea}`]: window.increment(-i.quantity)});
                 }
+                
                 fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_sale', data:d})});
+                
+                // --- KODE TAMBAHAN GOOGLE SHEET ---
+                const now = new Date();
+                const payloadData = {
+                    tanggal: now.toISOString().split('T')[0],
+                    waktu: now.toLocaleTimeString('id-ID'),
+                    idTransaksi: "TRX-" + now.getTime(),
+                    nominal: tot,
+                    lokasi: currentArea,
+                    kasir: activeShift.cashierName
+                };
+
+                fetch(NEW_SHEET_API_URL, {
+                    method: "POST",
+                    body: JSON.stringify(payloadData)
+                }).catch(err => console.error("Gagal push ke Sheet", err));
+                // -----------------------------------
+                
                 lastTransaction=d; showReceipt(); resetTransaction(); showToast("Transaksi Berhasil"); loadProducts();
             } catch(e) { 
                 console.error(e);
@@ -805,7 +827,26 @@
                              await window.updateDoc(window.doc(window.db,"products",i.docId), {[`Stok Area Kasir ${d.area}`]: window.increment(-i.quantity)});
                          }
                     }
+                    
                     fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_sale', data:d})});
+                    
+                    // --- KODE TAMBAHAN GOOGLE SHEET UNTUK SINKRONISASI OFFLINE ---
+                    const txDate = new Date(d.timestamp);
+                    const payloadDataSync = {
+                        tanggal: txDate.toISOString().split('T')[0],
+                        waktu: txDate.toLocaleTimeString('id-ID'),
+                        idTransaksi: "TRX-" + txDate.getTime(),
+                        nominal: d.total,
+                        lokasi: d.area,
+                        kasir: activeShift ? activeShift.cashierName : "Kasir Offline"
+                    };
+
+                    fetch(NEW_SHEET_API_URL, {
+                        method: "POST",
+                        body: JSON.stringify(payloadDataSync)
+                    }).catch(err => console.error("Gagal sync ke Sheet", err));
+                    // -----------------------------------------------------------
+                    
                     successCount++;
                 } catch (e) {
                     console.error("Sync failed:", e);
