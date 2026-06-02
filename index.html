@@ -168,6 +168,7 @@
                 
                 <button onclick="openExportModal()" class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all"><span>📊</span> Laporan</button>
                 <button onclick="showReceivingModal()" class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all"><span>📦</span> Cek PO</button>
+                <button onclick="openExpiryModal()" class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all"><span>⏳</span> Kadaluarsa</button>
                 <button onclick="closeShiftModal()" class="bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-100 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all">🛑 Tutup</button>
             </div>
         </header>
@@ -411,6 +412,7 @@
                                     <th class="p-4 font-bold text-center w-24">Sistem</th>
                                     <th class="p-4 font-bold text-center w-28">Fisik</th>
                                     <th class="p-4 font-bold text-center w-32">Kondisi</th>
+                                    <th class="p-4 font-bold text-center w-36">Kadaluarsa</th>
                                 </tr>
                             </thead>
                             <tbody id="receivingTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
@@ -427,6 +429,37 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Atur Kadaluarsa -->
+    <div id="expiryModal" class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-4xl shadow-2xl flex flex-col h-[85vh] border border-slate-100">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="font-extrabold text-xl text-slate-800 flex items-center gap-3">
+                    <span class="bg-orange-100 p-2 rounded-lg text-xl">⏳</span> Atur Tanggal Kadaluarsa
+                </h3>
+                <button onclick="closeExpiryModal()" class="text-slate-400 hover:text-red-500 bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center transition-colors active:scale-95 text-xl font-bold">✕</button>
+            </div>
+            
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6">
+                <input type="text" id="expirySearch" onkeyup="filterExpiryList()" placeholder="Cari nama barang atau barcode..." class="w-full p-3 border-2 border-slate-200 rounded-xl text-sm bg-white font-medium focus:border-orange-500 outline-none">
+            </div>
+            
+            <div class="flex-1 overflow-auto bg-white border border-slate-200 rounded-2xl shadow-sm">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-slate-100 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-10 shadow-sm">
+                        <tr>
+                            <th class="p-4 font-bold">Produk</th>
+                            <th class="p-4 font-bold text-center">Stok Area</th>
+                            <th class="p-4 font-bold text-center w-48">Tgl Kadaluarsa</th>
+                            <th class="p-4 font-bold text-center w-24">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expiryTableBody" class="divide-y divide-slate-100">
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -513,7 +546,6 @@
         const POS_API_URL = 'https://script.google.com/macros/s/AKfycbwkZVsoGXdgxck4xwOXk2fW4Oawn6diXu2bUX0sAIRFCfGeS1jTr6QjEH6Fr6-RFbnDAw/exec';
         const EVOUCHER_API_URL = "https://script.google.com/macros/s/AKfycbyQFkZW0QuBXi082jgXTsVBIy1OfVfhaQYVogvr7uBJBrCuGtkM73tTGqA1dl9ThlfL/exec";
         
-        // Konstanta baru untuk API Google Sheet transaksi tambahan
         const NEW_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwoW8zffXN_A1Z3y5SiVknDSO62s5ZBnYu7WQpu00ak-kDeH5PPsZZAg_-vXHGlknjR/exec";
 
         let currentArea = '', availableProducts = [], cart = [], selectedPaymentMethod = '', lastTransaction = null;
@@ -778,7 +810,6 @@
                 
                 fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_sale', data:d})});
                 
-                // --- KODE TAMBAHAN GOOGLE SHEET ---
                 const now = new Date();
                 const payloadData = {
                     tanggal: now.toISOString().split('T')[0],
@@ -793,7 +824,6 @@
                     method: "POST",
                     body: JSON.stringify(payloadData)
                 }).catch(err => console.error("Gagal push ke Sheet", err));
-                // -----------------------------------
                 
                 lastTransaction=d; showReceipt(); resetTransaction(); showToast("Transaksi Berhasil"); loadProducts();
             } catch(e) { 
@@ -830,7 +860,6 @@
                     
                     fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_sale', data:d})});
                     
-                    // --- KODE TAMBAHAN GOOGLE SHEET UNTUK SINKRONISASI OFFLINE ---
                     const txDate = new Date(d.timestamp);
                     const payloadDataSync = {
                         tanggal: txDate.toISOString().split('T')[0],
@@ -845,7 +874,6 @@
                         method: "POST",
                         body: JSON.stringify(payloadDataSync)
                     }).catch(err => console.error("Gagal sync ke Sheet", err));
-                    // -----------------------------------------------------------
                     
                     successCount++;
                 } catch (e) {
@@ -930,8 +958,8 @@
                         const localProd = window.allProducts.find(p => String(p.Barcode) === String(item.barcode));
                         const poData = { price: parseInt(item.price || 0), hpp: parseInt(item.hpp || 0) };
                         const baseItem = localProd ? 
-                            localProd : { id: null, 'Nama Produk': item.name, Barcode: item.barcode, isNew: true, Harga: poData.price, HPP: poData.hpp };
-                        receivingCart.push({ ...baseItem, poQty: parseInt(item.qty), receivedQty: parseInt(item.qty), condition: 'Baik', expiry: '' });
+                            localProd : { id: null, 'Nama Produk': item.name, Barcode: item.barcode, isNew: true, Harga: poData.price, HPP: poData.hpp, Kadaluarsa: '' };
+                        receivingCart.push({ ...baseItem, poQty: parseInt(item.qty), receivedQty: parseInt(item.qty), condition: 'Baik', expiry: baseItem.Kadaluarsa || '' });
                     });
                     document.getElementById('poBatchNo').textContent = data.batchNumber;
                     document.getElementById('poSupplier').textContent = data.supplier;
@@ -945,9 +973,9 @@
         };
 
         window.updateRecvItem = function(idx, field, value) {
-            if(field === 'receivedQty') receivingCart[idx].receivedQty = parseInt(value) || 0;
-            else if(field === 'condition') receivingCart[idx].condition = value;
-            renderReceiving();
+            if(field === 'receivedQty') { receivingCart[idx].receivedQty = parseInt(value) || 0; renderReceiving(); }
+            else if(field === 'condition') { receivingCart[idx].condition = value; renderReceiving(); }
+            else if(field === 'expiry') { receivingCart[idx].expiry = value; }
         }
 
         function renderReceiving() {
@@ -972,6 +1000,9 @@
                             <option value="Baik" ${i.condition==='Baik'?'selected':''}>Bagus</option>
                             <option value="Rusak" ${i.condition==='Rusak'?'selected':''}>Rusak</option>
                         </select>
+                    </td>
+                    <td class="p-4 text-center">
+                        <input type="date" value="${i.expiry || ''}" onchange="window.updateRecvItem(${x}, 'expiry', this.value)" class="w-full p-2 border-2 border-slate-200 rounded-xl text-xs font-bold focus:border-purple-500 focus:outline-none transition-colors text-slate-700">
                     </td>
                 </tr>`).join('');
             
@@ -1005,6 +1036,7 @@
                             if (!snap.empty) {
                                 const docRef = snap.docs[0].ref;
                                 const updateData = {[k]: window.increment(Number(item.receivedQty))};
+                                if (item.expiry) updateData['Kadaluarsa'] = item.expiry;
                                 await window.setDoc(docRef, updateData, { merge: true });
                             } else {
                                 const newProduct = {
@@ -1012,7 +1044,8 @@
                                     "Barcode": String(item.Barcode),
                                     "Harga": Number(item.Harga) || 0,
                                     "HPP": Number(item.HPP) || 0,
-                                    [k]: Number(item.receivedQty)
+                                    [k]: Number(item.receivedQty),
+                                    "Kadaluarsa": item.expiry || ""
                                 };
                                 await window.addDoc(window.collection(window.db, "products"), newProduct);
                             }
@@ -1030,7 +1063,7 @@
                         logId: "RCV-"+Date.now(), type: "RECEIVING", area: currentArea,
                         items: receivingCart.map(i=>({
                             name: i['Nama Produk'], qtyPO: i.poQty, qtyReceived: i.receivedQty,
-                            condition: i.condition, expiry: '-'
+                            condition: i.condition, expiry: i.expiry || '-'
                         })),
                         poReference: activePO.batchNumber,
                         note: "", timestamp: new Date().toISOString(), user: activeShift?activeShift.cashierName:"Admin"
@@ -1050,6 +1083,72 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = originalText;
+            }
+        }
+
+        function openExpiryModal() {
+            if (!navigator.onLine) return showToast("Fitur kadaluarsa butuh internet", true);
+            document.getElementById('expiryModal').classList.remove('hidden');
+            document.getElementById('expirySearch').value = '';
+            renderExpiryList();
+        }
+
+        function closeExpiryModal() {
+            document.getElementById('expiryModal').classList.add('hidden');
+            loadProducts();
+        }
+
+        function renderExpiryList(term = '') {
+            const tbody = document.getElementById('expiryTableBody');
+            const termLower = term.toLowerCase();
+            
+            const filtered = availableProducts.filter(p => 
+                String(p['Nama Produk']).toLowerCase().includes(termLower) || 
+                String(p.Barcode).toLowerCase().includes(termLower)
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center p-12 text-slate-400 font-medium bg-slate-50">Barang tidak ditemukan</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(p => {
+                const stock = p[`Stok Area Kasir ${currentArea}`] || 0;
+                const exp = p.Kadaluarsa || '';
+                return `
+                <tr class="hover:bg-orange-50/50 transition-colors bg-white">
+                    <td class="p-4 font-bold text-slate-700">${p['Nama Produk']}<br><span class="text-xs text-slate-400 font-mono bg-slate-100 px-1 py-0.5 rounded">${p.Barcode}</span></td>
+                    <td class="p-4 text-center font-extrabold text-slate-800">${stock}</td>
+                    <td class="p-4 text-center">
+                        <input type="date" id="exp_${p.id}" value="${exp}" class="w-full p-3 border-2 border-slate-200 rounded-xl text-sm focus:border-orange-500 outline-none text-slate-700 font-medium">
+                    </td>
+                    <td class="p-4 text-center">
+                        <button onclick="saveExpiry('${p.id}')" class="bg-orange-100 text-orange-700 px-4 py-3 w-full rounded-xl text-xs font-bold hover:bg-orange-200 transition-colors active:scale-95 shadow-sm">Simpan</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function filterExpiryList() {
+            renderExpiryList(document.getElementById('expirySearch').value);
+        }
+
+        async function saveExpiry(docId) {
+            const dateVal = document.getElementById(`exp_${docId}`).value;
+            try {
+                await window.updateDoc(window.doc(window.db, "products", docId), { Kadaluarsa: dateVal });
+                
+                const pIndex = availableProducts.findIndex(p => p.id === docId);
+                if(pIndex > -1) availableProducts[pIndex].Kadaluarsa = dateVal;
+                
+                const aIndex = window.allProducts.findIndex(p => p.id === docId);
+                if(aIndex > -1) window.allProducts[aIndex].Kadaluarsa = dateVal;
+                
+                localStorage.setItem(`adamart_products_${currentArea}`, JSON.stringify(window.allProducts));
+                
+                showToast("Tanggal kadaluarsa tersimpan");
+            } catch(e) {
+                showToast("Gagal menyimpan data", true);
             }
         }
 
@@ -1197,7 +1296,6 @@
             
             updateCartDisplay(); 
             
-            // Subtle pop animation on mobile cart button
             const mobileBtn = document.getElementById('mobileCartBtn');
             if (mobileBtn && !mobileBtn.classList.contains('hidden')) {
                 mobileBtn.classList.add('scale-110');
@@ -1273,9 +1371,6 @@
             const panel = document.getElementById('cartPanel');
             if(panel) {
                 panel.classList.toggle('translate-x-full');
-                if(!panel.classList.contains('translate-x-full')) {
-                    // Optional: add overlay backdrop for mobile cart
-                }
             }
         }
 
@@ -1480,6 +1575,10 @@
         window.fetchReportData = fetchReportData;
         window.downloadExcelReport = downloadExcelReport;
         window.copyReportData = copyReportData;
+        window.openExpiryModal = openExpiryModal;
+        window.closeExpiryModal = closeExpiryModal;
+        window.saveExpiry = saveExpiry;
+        window.filterExpiryList = filterExpiryList;
     </script>
 </body>
 </html>
