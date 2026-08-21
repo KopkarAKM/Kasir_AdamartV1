@@ -2,13 +2,22 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Adamart - Kasir Offline First</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Adamart - Kasir Offline First & Real-Time Sync</title>
+    
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Firebase Module -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, updateDoc, setDoc, doc, query, where, increment, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, setDoc, doc, query, where, increment, enableIndexedDbPersistence, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
@@ -42,6 +51,7 @@
         window.query = query;
         window.where = where;
         window.increment = increment;
+        window.onSnapshot = onSnapshot;
         
         signInAnonymously(auth)
             .then(() => {
@@ -52,86 +62,150 @@
             });
     </script>
 
+    <!-- Tailwind Configuration & Design Tokens -->
     <script>
-        tailwind.config = { theme: { extend: { colors: { 'adamart': { 50: '#f0f9ff', 500: '#0ea5e9', 600: '#0284c7', 900: '#0c4a6e' } } } } }
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        'adamart': {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                            950: '#082f49'
+                        }
+                    }
+                }
+            }
+        }
     </script>
+
     <style>
-        body { -webkit-tap-highlight-color: transparent; }
-        .offline-mode { border: 2px solid #ef4444; }
-        .online-mode { border: 2px solid #22c55e; }
-        @keyframes pulse-subtle { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        body {
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        
+        .safe-pb {
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        }
+        
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
         .syncing { animation: pulse-subtle 1s infinite; }
         
-        /* Custom Scrollbar for better desktop UX */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        input:focus-visible, button:focus-visible, select:focus-visible {
+            outline: 2px solid #0284c7;
+            outline-offset: 2px;
+        }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans text-slate-800 selection:bg-blue-200">
+<body class="bg-slate-50 min-h-screen text-slate-800 selection:bg-blue-200 antialiased">
     
     <!-- Layar Pemilihan Area -->
-    <div id="areaSelection" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-slate-100">
-        <div class="bg-white rounded-3xl p-8 shadow-2xl max-w-md w-full border border-slate-100">
-            <div class="text-center mb-10">
-                <div class="bg-blue-100 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
-                    <span class="text-4xl">⚡</span>
+    <div id="areaSelection" class="min-h-screen flex items-center justify-center p-4 md:p-8 bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-50/50">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl max-w-md md:max-w-3xl lg:max-w-5xl w-full border border-slate-100/80 transition-all">
+            
+            <div class="text-center mb-8 md:mb-10">
+                <div class="bg-gradient-to-tr from-blue-600 to-indigo-500 w-20 h-20 md:w-24 md:h-24 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/25">
+                    <span class="text-4xl md:text-5xl">⚡</span>
                 </div>
-                <h1 class="text-3xl font-extrabold text-slate-900 mb-2">Adamart POS</h1>
-                <p class="text-slate-500 font-medium">Sistem Kasir Pintar & Cepat</p>
+                <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-2">Adamart POS</h1>
+                <p class="text-slate-500 font-medium text-sm md:text-base">Kasir Pintar & Dynamic Real-Time Sync</p>
             </div>
-            <div class="space-y-4">
-                <button onclick="promptPassword('adamart 73')" class="w-full bg-white hover:bg-blue-50 text-slate-700 p-5 rounded-2xl transition-all duration-200 flex justify-between items-center border-2 border-slate-100 hover:border-blue-200 hover:shadow-md active:scale-95 group">
-                    <div class="flex items-center gap-4">
-                        <div class="bg-blue-100 p-3 rounded-xl group-hover:bg-blue-200 transition-colors"><span class="text-2xl">🏢</span></div>
-                        <div class="text-left font-bold text-lg">Adamart 73<div class="text-xs font-semibold text-slate-400 mt-1 uppercase tracking-wider">Area Utama</div></div>
+
+            <!-- Responsive Button Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                
+                <button onclick="promptPassword('adamart 73')" role="button" aria-label="Pilih Area Adamart 73" class="w-full bg-white hover:bg-blue-50/70 text-slate-700 p-5 md:p-6 rounded-2xl transition-all duration-200 flex flex-col justify-between border-2 border-slate-100 hover:border-blue-300 hover:shadow-xl active:scale-95 group min-h-[140px] text-left">
+                    <div class="flex items-start justify-between w-full mb-4">
+                        <div class="bg-blue-100 p-3.5 rounded-2xl group-hover:bg-blue-200 transition-colors">
+                            <span class="text-3xl">🏢</span>
+                        </div>
+                        <span class="text-blue-600 font-extrabold text-xl group-hover:translate-x-1 transition-transform">→</span>
                     </div>
-                    <span class="text-blue-500 font-bold group-hover:translate-x-1 transition-transform">→</span>
-                </button>
-                <button onclick="promptPassword('adamart induksi')" class="w-full bg-white hover:bg-emerald-50 text-slate-700 p-5 rounded-2xl transition-all duration-200 flex justify-between items-center border-2 border-slate-100 hover:border-emerald-200 hover:shadow-md active:scale-95 group">
-                    <div class="flex items-center gap-4">
-                        <div class="bg-emerald-100 p-3 rounded-xl group-hover:bg-emerald-200 transition-colors"><span class="text-2xl">⚡</span></div>
-                        <div class="text-left font-bold text-lg">Adamart Induksi<div class="text-xs font-semibold text-slate-400 mt-1 uppercase tracking-wider">Area Induksi</div></div>
+                    <div>
+                        <div class="font-extrabold text-xl text-slate-900">Adamart 73</div>
+                        <div class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wider">Area Utama</div>
                     </div>
-                    <span class="text-emerald-500 font-bold group-hover:translate-x-1 transition-transform">→</span>
                 </button>
-                <button onclick="promptPassword('adamart kelanis')" class="w-full bg-white hover:bg-purple-50 text-slate-700 p-5 rounded-2xl transition-all duration-200 flex justify-between items-center border-2 border-slate-100 hover:border-purple-200 hover:shadow-md active:scale-95 group">
-                    <div class="flex items-center gap-4">
-                        <div class="bg-purple-100 p-3 rounded-xl group-hover:bg-purple-200 transition-colors"><span class="text-2xl">🌟</span></div>
-                        <div class="text-left font-bold text-lg">Adamart Kelanis<div class="text-xs font-semibold text-slate-400 mt-1 uppercase tracking-wider">Area Kelanis</div></div>
+
+                <button onclick="promptPassword('adamart induksi')" role="button" aria-label="Pilih Area Adamart Induksi" class="w-full bg-white hover:bg-emerald-50/70 text-slate-700 p-5 md:p-6 rounded-2xl transition-all duration-200 flex flex-col justify-between border-2 border-slate-100 hover:border-emerald-300 hover:shadow-xl active:scale-95 group min-h-[140px] text-left">
+                    <div class="flex items-start justify-between w-full mb-4">
+                        <div class="bg-emerald-100 p-3.5 rounded-2xl group-hover:bg-emerald-200 transition-colors">
+                            <span class="text-3xl">⚡</span>
+                        </div>
+                        <span class="text-emerald-600 font-extrabold text-xl group-hover:translate-x-1 transition-transform">→</span>
                     </div>
-                    <span class="text-purple-500 font-bold group-hover:translate-x-1 transition-transform">→</span>
+                    <div>
+                        <div class="font-extrabold text-xl text-slate-900">Adamart Induksi</div>
+                        <div class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wider">Area Induksi</div>
+                    </div>
                 </button>
+
+                <button onclick="promptPassword('adamart kelanis')" role="button" aria-label="Pilih Area Adamart Kelanis" class="w-full bg-white hover:bg-purple-50/70 text-slate-700 p-5 md:p-6 rounded-2xl transition-all duration-200 flex flex-col justify-between border-2 border-slate-100 hover:border-purple-300 hover:shadow-xl active:scale-95 group min-h-[140px] text-left">
+                    <div class="flex items-start justify-between w-full mb-4">
+                        <div class="bg-purple-100 p-3.5 rounded-2xl group-hover:bg-purple-200 transition-colors">
+                            <span class="text-3xl">🌟</span>
+                        </div>
+                        <span class="text-purple-600 font-extrabold text-xl group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                    <div>
+                        <div class="font-extrabold text-xl text-slate-900">Adamart Kelanis</div>
+                        <div class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wider">Area Kelanis</div>
+                    </div>
+                </button>
+
             </div>
-            <p class="text-xs text-center text-slate-400 mt-8 font-medium">Bekerja lancar tanpa koneksi internet.</p>
+            
+            <div class="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 font-semibold">
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Real-time Sync & Audit Trail Active</span>
+                <span>Versi POS Tablet 2.1</span>
+            </div>
         </div>
     </div>
 
     <!-- Modal Password -->
-    <div id="passwordModal" class="hidden fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-3xl p-8 w-full max-w-sm text-center shadow-2xl transform scale-100 transition-transform">
-            <div class="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span class="text-2xl">🔒</span>
+    <div id="passwordModal" role="dialog" aria-modal="true" aria-labelledby="passwordTitle" class="hidden fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-sm md:max-w-md lg:max-w-lg text-center shadow-2xl transform scale-100 transition-transform border border-slate-100">
+            <div class="bg-blue-50 text-blue-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100 shadow-inner">
+                <span class="text-3xl">🔒</span>
             </div>
-            <h2 class="text-2xl font-bold mb-6 text-slate-800">PIN Keamanan</h2>
+            <h2 id="passwordTitle" class="text-2xl font-extrabold mb-6 text-slate-800">PIN Keamanan</h2>
             <form onsubmit="verifyPassword(event)" class="space-y-6">
                 <div>
-                    <input type="password" id="areaPassword" class="w-full p-4 rounded-xl bg-slate-50 border-2 border-slate-100 text-center text-3xl tracking-[1em] font-mono focus:bg-white focus:border-blue-500 focus:outline-none transition-colors" required placeholder="••••">
+                    <input type="password" id="areaPassword" aria-label="Masukkan PIN Keamanan" class="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 text-center text-2xl sm:text-3xl tracking-[0.5em] sm:tracking-[0.8em] font-mono focus:bg-white focus:border-blue-500 focus:outline-none transition-all shadow-inner" required placeholder="••••">
                 </div>
                 <div class="flex gap-3">
-                    <button type="button" onclick="closePasswordModal()" class="flex-1 bg-slate-100 text-slate-600 py-4 rounded-xl font-bold hover:bg-slate-200 transition-colors active:scale-95">Batal</button>
-                    <button type="submit" class="flex-1 bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors active:scale-95">Masuk</button>
+                    <button type="button" onclick="closePasswordModal()" class="flex-1 bg-slate-100 text-slate-600 py-4 rounded-xl font-bold hover:bg-slate-200 transition-colors active:scale-95 min-h-[48px]">Batal</button>
+                    <button type="submit" class="flex-1 bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors active:scale-95 min-h-[48px]">Masuk</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Loading Screen -->
-    <div id="loadingScreen" class="hidden min-h-screen flex items-center justify-center p-4 bg-white z-50 fixed inset-0">
+    <div id="loadingScreen" role="status" aria-live="polite" aria-label="Loading" class="hidden min-h-screen flex items-center justify-center p-4 bg-white z-50 fixed inset-0">
         <div class="text-center">
             <div class="animate-spin text-5xl mb-6 text-blue-600 inline-block">⏳</div>
-            <h3 class="text-xl font-bold text-slate-800" id="loadingText">Menyiapkan Data...</h3>
+            <h3 class="text-xl font-extrabold text-slate-800" id="loadingText">Menyiapkan Data...</h3>
             <p class="text-slate-500 mt-2 text-sm font-medium">Mohon tunggu sebentar</p>
         </div>
     </div>
@@ -140,77 +214,82 @@
     <div id="cashierInterface" class="hidden flex flex-col h-screen overflow-hidden bg-slate-50">
         
         <!-- Header -->
-        <header class="bg-white border-b border-slate-200 px-4 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-20" id="mainHeader">
+        <header class="bg-white border-b border-slate-200 px-4 md:px-6 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-20 shadow-sm" id="mainHeader">
             <div class="flex items-center justify-between sm:justify-start gap-4">
-                <div>
-                    <h1 class="text-xl font-extrabold text-slate-900 tracking-tight leading-none">ADAMART</h1>
-                    <p id="currentArea" class="text-xs font-bold text-blue-600 uppercase tracking-widest mt-1">-</p>
-                </div>
+                <button onclick="changeArea()" class="text-left group cursor-pointer flex items-center gap-3">
+                    <div class="bg-blue-600 text-white p-2.5 rounded-xl font-extrabold text-lg shadow-md group-hover:bg-blue-700 transition-colors">AD</div>
+                    <div>
+                        <h1 class="text-lg md:text-xl font-extrabold text-slate-900 tracking-tight leading-none">ADAMART POS</h1>
+                        <p id="currentArea" class="text-xs font-bold text-blue-600 uppercase tracking-widest mt-1">-</p>
+                    </div>
+                </button>
+                
                 <div class="flex items-center gap-2">
-                    <div id="connectionStatus" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-emerald-200">
+                    <div id="connectionStatus" class="bg-emerald-100 text-emerald-700 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-emerald-200">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> ONLINE
                     </div>
-                    <button onclick="forceRefreshData()" class="bg-slate-100 p-2 rounded-lg hover:bg-slate-200 text-slate-600 text-sm flex items-center justify-center w-8 h-8 transition-colors active:scale-95" title="Muat Ulang Data">
+                    <button onclick="forceRefreshData()" aria-label="Muat Ulang Data Kasir" class="bg-slate-100 p-2 rounded-xl hover:bg-slate-200 text-slate-600 text-sm flex items-center justify-center w-9 h-9 transition-colors active:scale-95" title="Muat Ulang Data">
                         🔄
                     </button>
                 </div>
             </div>
             
             <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
-                <div id="offlineQueueBadge" class="hidden bg-amber-100 border border-amber-300 text-amber-800 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer hover:bg-amber-200 flex items-center gap-2 animate-pulse whitespace-nowrap" onclick="syncOfflineData()">
+                <div id="offlineQueueBadge" class="hidden bg-amber-100 border border-amber-300 text-amber-800 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer hover:bg-amber-200 flex items-center gap-2 animate-pulse whitespace-nowrap" onclick="syncOfflineData()">
                     <span>⚠️</span> <span id="offlineCount">0</span> Tertunda
                 </div>
 
-                <div class="hidden md:flex items-center bg-slate-50 px-4 py-2 rounded-lg text-xs border border-slate-200 whitespace-nowrap">
-                    <span class="text-slate-500 mr-2">Kasir:</span>
+                <div class="hidden md:flex items-center bg-slate-50 px-4 py-2 rounded-xl text-xs border border-slate-200 whitespace-nowrap">
+                    <span class="text-slate-500 mr-2 font-medium">Kasir:</span>
                     <span id="headerCashierName" class="font-bold text-slate-800">-</span>
                 </div>
                 
-                <button onclick="openExportModal()" class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all"><span>📊</span> Laporan</button>
-                <button onclick="showReceivingModal()" class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all"><span>📦</span> Cek PO</button>
-                <button onclick="openExpiryModal()" class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all"><span>⏳</span> Kadaluarsa</button>
-                <button onclick="closeShiftModal()" class="bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-100 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all">🛑 Tutup</button>
+                <button onclick="openAuditModal()" aria-label="Lihat Audit Trail" class="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3.5 py-2.5 rounded-xl text-xs font-bold hover:bg-indigo-100 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all min-h-[40px]"><span>🎬</span> Audit Log</button>
+                <button onclick="openExportModal()" aria-label="Buka Laporan" class="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all min-h-[40px]"><span>📊</span> Laporan</button>
+                <button onclick="showReceivingModal()" aria-label="Cek Surat Jalan PO" class="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all min-h-[40px]"><span>📦</span> Cek PO</button>
+                <button onclick="openExpiryModal()" aria-label="Atur Tanggal Kadaluarsa" class="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all min-h-[40px]"><span>⏳</span> Kadaluarsa</button>
+                <button onclick="closeShiftModal()" aria-label="Tutup Shift Kasir" class="bg-red-50 text-red-700 border border-red-200 px-3.5 py-2.5 rounded-xl text-xs font-bold hover:bg-red-100 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all min-h-[40px]">🛑 Tutup</button>
             </div>
         </header>
 
-        <!-- Area Konten -->
+        <!-- Area Konten Utama -->
         <div class="flex flex-1 overflow-hidden relative">
             
             <!-- Kiri: Area Produk -->
-            <div class="flex-1 flex flex-col overflow-hidden bg-slate-50 w-full">
+            <div class="flex-1 flex flex-col overflow-hidden bg-slate-50 w-full min-w-0">
                 <!-- Bar Pencarian (Sticky) -->
                 <div class="bg-white p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-3 shadow-sm z-10 shrink-0">
                     <div class="relative flex-1 group">
                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors text-lg">🔍</span>
-                        <input type="text" id="productSearch" placeholder="Cari nama barang atau barcode..." class="w-full pl-12 pr-4 py-3 border-2 border-slate-100 rounded-xl text-sm font-medium focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all bg-slate-50 focus:bg-white">
+                        <input type="text" id="productSearch" aria-label="Cari Produk" placeholder="Cari nama barang atau barcode..." class="w-full pl-12 pr-4 py-3.5 border-2 border-slate-100 rounded-2xl text-sm font-medium focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all bg-slate-50 focus:bg-white min-h-[48px]">
                     </div>
-                    <select id="productSelect" class="w-full sm:w-64 py-3 px-4 border-2 border-slate-100 rounded-xl text-sm font-medium bg-slate-50 focus:border-blue-500 outline-none cursor-pointer">
+                    <select id="productSelect" aria-label="Pilih Produk Manual" class="w-full sm:w-64 py-3.5 px-4 border-2 border-slate-100 rounded-2xl text-sm font-medium bg-slate-50 focus:border-blue-500 outline-none cursor-pointer min-h-[48px]">
                         <option value="">Pilih Manual...</option>
                     </select>
                 </div>
                 
-                <!-- Grid Produk -->
-                <div id="productGrid" class="flex-1 overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 content-start pb-28 lg:pb-6">
+                <!-- Grid Produk Responsif -->
+                <div id="productGrid" class="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 content-start pb-28 md:pb-6">
                     <!-- Produk dirender di sini via JS -->
                 </div>
             </div>
 
-            <!-- Tombol Keranjang Mengambang (Ponsel) -->
-            <button onclick="toggleMobileCart()" id="mobileCartBtn" class="lg:hidden fixed bottom-6 right-6 bg-blue-600 text-white w-16 h-16 rounded-full shadow-2xl shadow-blue-500/50 z-30 flex items-center justify-center transform transition active:scale-90 hover:bg-blue-700 border-4 border-white">
+            <!-- Tombol Keranjang Mengambang (Khusus Mobile < 768px) -->
+            <button onclick="toggleMobileCart()" id="mobileCartBtn" aria-label="Buka Keranjang Belanja" class="md:hidden fixed bottom-6 right-6 bg-blue-600 text-white w-16 h-16 rounded-full shadow-2xl shadow-blue-500/50 z-30 flex items-center justify-center transform transition active:scale-90 hover:bg-blue-700 border-4 border-white">
                 <span class="text-2xl">🛒</span>
                 <span id="mobileCartCount" class="absolute -top-1 -right-1 bg-red-500 text-white min-w-[24px] h-6 flex items-center justify-center rounded-full text-xs font-bold border-2 border-white px-1">0</span>
             </button>
 
-            <!-- Kanan: Panel Keranjang -->
-            <div id="cartPanel" class="fixed lg:static inset-y-0 right-0 w-full sm:w-[400px] bg-white shadow-2xl lg:shadow-none lg:border-l border-slate-200 flex flex-col z-40 transform translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+            <!-- Kanan: Panel Keranjang (Sticky Sidebar di Tablet >= 768px & Desktop, Drawer Slide-Over di Mobile) -->
+            <div id="cartPanel" class="fixed md:static inset-y-0 right-0 w-full sm:w-[380px] md:w-[360px] lg:w-[400px] xl:w-[420px] bg-white shadow-2xl md:shadow-none md:border-l border-slate-200 flex flex-col z-40 transform translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shrink-0">
                 
                 <!-- Header Keranjang -->
-                <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+                <div class="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
                     <h3 class="font-extrabold text-slate-800 flex items-center gap-3 text-lg">
-                        <button onclick="toggleMobileCart()" class="lg:hidden text-slate-400 hover:text-slate-700 bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors">✕</button>
-                        <span>🛒</span> Keranjang
+                        <button onclick="toggleMobileCart()" aria-label="Tutup Keranjang Mobile" class="md:hidden text-slate-400 hover:text-slate-700 bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors">✕</button>
+                        <span>🛒</span> Keranjang Belanja
                     </h3>
-                    <button onclick="clearCart()" class="text-red-500 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors active:scale-95">Kosongkan</button>
+                    <button onclick="clearCart()" class="text-red-500 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors active:scale-95">Kosongkan</button>
                 </div>
                 
                 <!-- Daftar Item Keranjang -->
@@ -219,57 +298,152 @@
                 </div>
                 
                 <!-- Footer Pembayaran -->
-                <div class="p-5 border-t border-slate-100 bg-white shrink-0 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
-                    <div class="flex justify-between items-end mb-5">
-                        <span class="font-bold text-slate-500 text-sm uppercase tracking-wide">Total Pembayaran</span>
-                        <span id="totalAmount" class="font-extrabold text-3xl text-blue-600 tracking-tight">Rp 0</span>
+                <div class="p-5 border-t border-slate-100 bg-white shrink-0 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] safe-pb">
+                    
+                    <div class="flex justify-between items-end mb-4">
+                        <span class="font-bold text-slate-500 text-xs uppercase tracking-wider">Total Pembayaran</span>
+                        <span id="totalAmount" class="font-extrabold text-2xl sm:text-3xl text-blue-600 tracking-tight">Rp 0</span>
                     </div>
                     
-                    <div class="grid grid-cols-3 gap-3 mb-4">
-                        <button onclick="selectPaymentMethod('Tunai')" id="payTunai" class="payment-btn bg-white border-2 border-slate-200 py-3 rounded-xl text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95">💵 Tunai</button>
-                        <button onclick="selectPaymentMethod('QRIS')" id="payQRIS" class="payment-btn bg-white border-2 border-slate-200 py-3 rounded-xl text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95">📱 QRIS</button>
-                        <button onclick="selectPaymentMethod('Kasbon')" id="payKasbon" class="payment-btn bg-white border-2 border-slate-200 py-3 rounded-xl text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95">📝 Kasbon</button>
+                    <!-- Tombol Pilihan Pembayaran (Grid 4 Pilihan) -->
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <button onclick="selectPaymentMethod('Tunai')" id="payTunai" class="payment-btn bg-white border-2 border-slate-200 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95 min-h-[44px]">💵 Tunai</button>
+                        <button onclick="selectPaymentMethod('QRIS')" id="payQRIS" class="payment-btn bg-white border-2 border-slate-200 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95 min-h-[44px]">📱 QRIS</button>
+                        <button onclick="selectPaymentMethod('Kasbon')" id="payKasbon" class="payment-btn bg-white border-2 border-slate-200 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95 min-h-[44px]">📝 Kasbon</button>
+                        <button onclick="openSplitPaymentModal()" id="paySplit" class="payment-btn bg-white border-2 border-slate-200 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 transition-all hover:border-indigo-300 active:scale-95 min-h-[44px]">💳 Split Pay</button>
                     </div>
                     
-                    <button onclick="processTransaction()" id="checkoutBtn" disabled class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-base tracking-wide disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95">PILIH METODE BAYAR</button>
+                    <button onclick="processTransaction()" id="checkoutBtn" disabled class="w-full bg-blue-600 text-white py-4 rounded-2xl font-extrabold text-base tracking-wide disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95 min-h-[52px]">PILIH METODE BAYAR</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Audit Trail / Session Recording -->
+    <div id="auditTrailModal" role="dialog" aria-modal="true" aria-labelledby="auditTitle" class="hidden fixed inset-0 bg-slate-900/60 z-[90] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-4xl shadow-2xl flex flex-col h-[85vh] border border-slate-100">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="auditTitle" class="font-extrabold text-xl text-slate-800 flex items-center gap-3">
+                    <span class="bg-indigo-100 p-2 rounded-xl text-xl">🎬</span> Audit Trail & Log Aktivitas Sesi
+                </h3>
+                <button onclick="closeAuditModal()" aria-label="Tutup modal audit" class="text-slate-400 hover:text-red-500 bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center transition-colors active:scale-95 text-xl font-bold">✕</button>
+            </div>
+            
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-4 flex flex-col md:flex-row gap-3">
+                <input type="text" id="auditSearchInput" onkeyup="filterAuditLogs()" placeholder="Cari aktivitas atau nama kasir..." class="flex-1 p-3 border-2 border-slate-200 rounded-xl text-sm bg-white font-medium focus:border-indigo-500 outline-none">
+                <select id="auditFilterType" onchange="filterAuditLogs()" class="p-3 border-2 border-slate-200 rounded-xl text-sm bg-white font-bold focus:border-indigo-500 outline-none cursor-pointer">
+                    <option value="ALL">Semua Aksi</option>
+                    <option value="CART">Keranjang Belanja</option>
+                    <option value="PAYMENT">Pembayaran</option>
+                    <option value="SHIFT">Shift & Login</option>
+                    <option value="SYNC">Sinkronisasi</option>
+                </select>
+            </div>
+            
+            <div class="flex-1 overflow-auto bg-white border border-slate-200 rounded-2xl p-4 shadow-inner space-y-3" id="auditLogsList">
+                <!-- Log items rendered here -->
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400 font-semibold">
+                <span>Tersimpan lokal & Firestore `audit_logs`</span>
+                <button onclick="exportAuditLogs()" class="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl font-bold hover:bg-indigo-100 transition-colors">Unduh Log CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Split Payment -->
+    <div id="splitPaymentModal" role="dialog" aria-modal="true" aria-labelledby="splitTitle" class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl border border-slate-100">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="splitTitle" class="font-extrabold text-xl text-slate-800 flex items-center gap-2"><span>💳</span> Split Payment (Multi-Bayar)</h3>
+                <button onclick="closeSplitPaymentModal()" aria-label="Tutup modal split" class="text-slate-400 hover:text-red-500 bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors">✕</button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex justify-between items-center">
+                    <span class="text-xs font-bold text-blue-800 uppercase">Total Belanja:</span>
+                    <span class="font-extrabold text-xl text-blue-700" id="splitTotalDisplay">Rp 0</span>
+                </div>
+                
+                <div class="space-y-3">
+                    <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                        <label class="text-xs font-bold text-slate-500 block mb-1 uppercase">Metode Pertama</label>
+                        <div class="flex gap-2">
+                            <select id="splitMethod1" class="p-2.5 border-2 rounded-xl text-xs font-bold bg-white focus:border-blue-500 outline-none">
+                                <option value="Tunai">Tunai</option>
+                                <option value="QRIS">QRIS</option>
+                                <option value="Kasbon">Kasbon</option>
+                            </select>
+                            <input type="number" id="splitAmount1" oninput="calculateSplit()" placeholder="Jumlah Rp" class="flex-1 p-2.5 border-2 rounded-xl font-mono font-bold text-base focus:border-blue-500 outline-none">
+                        </div>
+                    </div>
+                    
+                    <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                        <label class="text-xs font-bold text-slate-500 block mb-1 uppercase">Metode Kedua</label>
+                        <div class="flex gap-2">
+                            <select id="splitMethod2" class="p-2.5 border-2 rounded-xl text-xs font-bold bg-white focus:border-blue-500 outline-none">
+                                <option value="QRIS">QRIS</option>
+                                <option value="Tunai">Tunai</option>
+                                <option value="Kasbon">Kasbon</option>
+                            </select>
+                            <input type="number" id="splitAmount2" oninput="calculateSplit()" placeholder="Jumlah Rp" class="flex-1 p-2.5 border-2 rounded-xl font-mono font-bold text-base focus:border-blue-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-4 bg-slate-100 rounded-2xl space-y-1.5 text-xs font-bold">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Total Dibayar:</span>
+                        <span id="splitTotalPaid" class="text-slate-800">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-600">Sisa Tagihan:</span>
+                        <span id="splitRemaining" class="text-red-600 font-extrabold">Rp 0</span>
+                    </div>
+                    <div id="splitChangeRow" class="hidden flex justify-between text-sm text-emerald-600">
+                        <span>Kembalian (Tunai):</span>
+                        <span id="splitChange" class="font-extrabold">Rp 0</span>
+                    </div>
+                </div>
+                
+                <button onclick="confirmSplitPayment()" id="btnConfirmSplit" disabled class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-base hover:bg-indigo-700 shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 min-h-[48px]">Gunakan Split Payment</button>
             </div>
         </div>
     </div>
 
     <!-- Modal Buka Shift -->
-    <div id="openShiftModal" class="fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-4 hidden backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-3xl p-8 w-full max-w-md text-center shadow-2xl border border-slate-100">
-            <div class="bg-amber-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+    <div id="openShiftModal" role="dialog" aria-modal="true" aria-labelledby="openShiftTitle" class="fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-4 hidden backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-md text-center shadow-2xl border border-slate-100">
+            <div class="bg-amber-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
                 <span class="text-4xl">☀️</span>
             </div>
-            <h2 class="text-2xl font-extrabold mb-2 text-slate-800">Mulai Shift Baru</h2>
-            <p class="text-slate-500 mb-8 font-medium">Selamat bertugas! Siapkan data awal kasir Anda.</p>
+            <h2 id="openShiftTitle" class="text-2xl font-extrabold mb-2 text-slate-800">Mulai Shift Baru</h2>
+            <p class="text-slate-500 mb-8 text-sm font-medium">Selamat bertugas! Siapkan data awal kasir Anda.</p>
             
             <form onsubmit="startShift(event)" class="space-y-5 text-left">
                 <div>
                     <label class="font-bold text-xs text-slate-500 uppercase tracking-wider block mb-2">Nama Kasir</label>
-                    <input type="text" id="shiftCashier" class="w-full p-4 border-2 border-slate-100 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-500 focus:outline-none transition-colors font-medium text-lg" required placeholder="Contoh: Budi">
+                    <input type="text" id="shiftCashier" class="w-full p-4 border-2 border-slate-100 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-500 focus:outline-none transition-colors font-medium text-base sm:text-lg" required placeholder="Contoh: Budi">
                 </div>
                 <div>
                     <label class="font-bold text-xs text-slate-500 uppercase tracking-wider block mb-2">Modal Uang Fisik (Rp)</label>
                     <input type="number" id="startCash" class="w-full p-4 border-2 border-slate-100 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-500 focus:outline-none transition-colors font-mono font-bold text-xl" required placeholder="0">
                 </div>
-                <button type="submit" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 mt-4">🚀 Buka Toko</button>
+                <button type="submit" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 mt-4 min-h-[50px]">🚀 Buka Toko</button>
             </form>
         </div>
     </div>
 
     <!-- Modal Tutup Shift -->
-    <div id="closeShiftModal" class="hidden fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+    <div id="closeShiftModal" role="dialog" aria-modal="true" aria-labelledby="closeShiftTitle" class="hidden fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto border border-slate-100">
             <div class="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
-                <h3 class="font-extrabold text-xl text-slate-800 flex items-center gap-2"><span>🛑</span> Tutup Shift</h3>
-                <span id="cs-time" class="text-sm font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full"></span>
+                <h3 id="closeShiftTitle" class="font-extrabold text-xl text-slate-800 flex items-center gap-2"><span>🛑</span> Tutup Shift</h3>
+                <span id="cs-time" class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full"></span>
             </div>
             
             <div class="space-y-3 mb-6 text-sm">
-                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
+                <div class="flex justify-between items-center p-3.5 bg-slate-50 rounded-2xl">
                     <span class="text-slate-500 font-medium">Kasir Bertugas</span>
                     <span class="font-bold text-slate-800" id="cs-name">-</span>
                 </div>
@@ -291,8 +465,8 @@
                         <span class="font-medium text-slate-500" id="cs-kasbon">0</span>
                     </div>
                 </div>
-                <div class="flex justify-between items-center mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
-                    <span class="font-bold text-blue-800">Total Seharusnya Ada:</span>
+                <div class="flex justify-between items-center mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                    <span class="font-bold text-blue-900 text-xs uppercase tracking-wide">Total Seharusnya Ada:</span>
                     <span class="font-extrabold text-xl text-blue-700 tracking-tight" id="cs-expected">0</span>
                 </div>
             </div>
@@ -303,19 +477,19 @@
                     <input type="number" id="actualCash" class="w-full p-4 bg-white border-2 border-amber-200 rounded-xl font-mono text-2xl font-bold text-right text-slate-800 focus:outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-100 transition-all" required placeholder="0">
                 </div>
                 <div class="flex gap-3">
-                    <button type="button" onclick="document.getElementById('closeShiftModal').classList.add('hidden')" class="flex-1 py-4 bg-slate-100 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors active:scale-95">Batal</button>
-                    <button type="submit" class="flex-1 py-4 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-200 transition-colors active:scale-95">Tutup Shift</button>
+                    <button type="button" onclick="document.getElementById('closeShiftModal').classList.add('hidden')" class="flex-1 py-4 bg-slate-100 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors active:scale-95 min-h-[48px]">Batal</button>
+                    <button type="submit" class="flex-1 py-4 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-200 transition-colors active:scale-95 min-h-[48px]">Tutup Shift</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Modal Kasbon -->
-    <div id="kasbonModal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-md relative shadow-2xl">
+    <div id="kasbonModal" role="dialog" aria-modal="true" aria-labelledby="kasbonTitle" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-md relative shadow-2xl border border-slate-100">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="font-extrabold text-xl text-slate-800 flex items-center gap-2"><span>💳</span> Pembayaran Kasbon</h3>
-                <button onclick="closeKasbonModal()" class="text-slate-400 hover:text-red-500 bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors">✕</button>
+                <h3 id="kasbonTitle" class="font-extrabold text-xl text-slate-800 flex items-center gap-2"><span>💳</span> Pembayaran Kasbon</h3>
+                <button onclick="closeKasbonModal()" aria-label="Tutup modal kasbon" class="text-slate-400 hover:text-red-500 bg-slate-100 w-9 h-9 rounded-full flex items-center justify-center transition-colors">✕</button>
             </div>
             
             <div id="kasbonLoading" class="hidden absolute inset-0 bg-white/95 flex items-center justify-center z-10 rounded-3xl backdrop-blur-sm">
@@ -329,8 +503,8 @@
                 <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                     <label class="text-xs font-bold text-slate-500 block mb-3 uppercase tracking-wide">Identitas Anggota</label>
                     <div class="flex gap-2">
-                        <input type="text" id="kasbonSearchId" placeholder="NIK / No Anggota" class="w-full p-3 bg-white border-2 border-slate-200 rounded-xl font-mono font-bold text-lg focus:outline-none focus:border-blue-500 transition-colors">
-                        <button type="button" onclick="checkEvoucherUser()" class="bg-blue-600 text-white px-6 rounded-xl font-bold hover:bg-blue-700 shadow-md active:scale-95 transition-all">Cek</button>
+                        <input type="text" id="kasbonSearchId" placeholder="NIK / No Anggota" class="w-full p-3.5 bg-white border-2 border-slate-200 rounded-xl font-mono font-bold text-lg focus:outline-none focus:border-blue-500 transition-colors">
+                        <button type="button" onclick="checkEvoucherUser()" class="bg-blue-600 text-white px-6 rounded-xl font-bold hover:bg-blue-700 shadow-md active:scale-95 transition-all min-h-[48px]">Cek</button>
                     </div>
                 </div>
                 
@@ -348,29 +522,29 @@
                     </div>
                 </div>
                 
-                <div class="flex justify-between items-center p-4 bg-slate-100 rounded-xl">
+                <div class="flex justify-between items-center p-4 bg-slate-100 rounded-2xl">
                     <span class="text-slate-600 font-bold text-sm">Total Belanja</span>
                     <span class="text-2xl font-extrabold text-blue-600 tracking-tight" id="evTotalAmountDisplay">Rp 0</span>
                 </div>
                 
                 <input type="hidden" id="evFoundUser" value="">
-                <button onclick="processKasbonTransaction()" id="evSubmitBtn" class="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold text-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95" disabled>Konfirmasi Pembayaran</button>
+                <button onclick="processKasbonTransaction()" id="evSubmitBtn" class="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold text-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 min-h-[50px]" disabled>Konfirmasi Pembayaran</button>
             </div>
         </div>
     </div>
 
     <!-- Modal Terima PO -->
-    <div id="receivingModal" class="hidden fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-2xl sm:rounded-3xl p-0 w-full max-w-6xl h-[95vh] sm:h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+    <div id="receivingModal" role="dialog" aria-modal="true" aria-labelledby="receivingTitle" class="hidden fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-0 w-full max-w-6xl h-[95vh] sm:h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
             
             <div class="p-4 sm:p-5 border-b border-slate-100 bg-purple-50 flex justify-between items-center shrink-0">
                 <div>
-                    <h3 class="font-extrabold text-xl text-purple-900 flex items-center gap-3">
-                        <span class="text-2xl">🚛</span> Terima Barang (Restock)
+                    <h3 id="receivingTitle" class="font-extrabold text-xl text-purple-900 flex items-center gap-3">
+                        <span class="text-2xl">🚛</span> Terima Barang (Restock PO)
                     </h3>
-                    <p class="text-sm text-purple-700 font-medium hidden sm:block">Periksa fisik barang sebelum masuk ke stok sistem</p>
+                    <p class="text-xs sm:text-sm text-purple-700 font-medium hidden sm:block">Periksa fisik barang sebelum masuk ke stok sistem</p>
                 </div>
-                <button onclick="closeReceivingModal()" class="text-slate-400 hover:text-red-500 bg-white shadow-sm w-10 h-10 flex items-center justify-center rounded-full transition-colors active:scale-95 text-lg font-bold">✕</button>
+                <button onclick="closeReceivingModal()" aria-label="Tutup modal PO" class="text-slate-400 hover:text-red-500 bg-white shadow-sm w-10 h-10 flex items-center justify-center rounded-full transition-colors active:scale-95 text-lg font-bold">✕</button>
             </div>
             
             <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
@@ -380,7 +554,7 @@
                         Antrean Surat Jalan
                     </div>
                     <div id="pendingPOList" class="flex-1 overflow-y-auto p-3 space-y-3">
-                        <div class="text-center py-10 text-slate-400 text-sm font-medium animate-pulse">Mencari data...</div>
+                        <div class="text-center py-10 text-slate-400 text-sm font-medium animate-pulse">Mencari dokumen...</div>
                     </div>
                 </div>
 
@@ -397,10 +571,10 @@
                         </div>
                     </div>
 
-                    <div id="poPlaceholder" class="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50">
-                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-center">
+                    <div id="poPlaceholder" class="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50 p-6">
+                        <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 text-center max-w-sm">
                             <div class="text-6xl mb-4 opacity-50">📑</div>
-                            <p class="font-medium text-lg text-slate-600">Pilih dokumen Surat Jalan<br>di daftar sebelah kiri</p>
+                            <p class="font-medium text-base text-slate-600">Pilih dokumen Surat Jalan<br>di daftar sebelah kiri</p>
                         </div>
                     </div>
 
@@ -424,7 +598,7 @@
                             <span class="text-slate-500 font-bold text-sm">Total Barang Layak:</span>
                             <span class="font-extrabold text-2xl text-purple-700 tracking-tight"><span id="recvTotalItems">0</span> Unit</span>
                         </div>
-                        <button id="btnSubmitRecv" onclick="confirmSubmitReceiving()" class="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 shadow-lg shadow-purple-200 transition-all active:scale-95">
+                        <button id="btnSubmitRecv" onclick="confirmSubmitReceiving()" class="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 shadow-lg shadow-purple-200 transition-all active:scale-95 min-h-[50px]">
                             ✅ Konfirmasi & Masuk Stok
                         </button>
                     </div>
@@ -434,17 +608,17 @@
     </div>
 
     <!-- Modal Atur Kadaluarsa -->
-    <div id="expiryModal" class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+    <div id="expiryModal" role="dialog" aria-modal="true" aria-labelledby="expiryTitle" class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity safe-pb">
         <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-4xl shadow-2xl flex flex-col h-[85vh] border border-slate-100">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="font-extrabold text-xl text-slate-800 flex items-center gap-3">
-                    <span class="bg-orange-100 p-2 rounded-lg text-xl">⏳</span> Atur Tanggal Kadaluarsa
+                <h3 id="expiryTitle" class="font-extrabold text-xl text-slate-800 flex items-center gap-3">
+                    <span class="bg-orange-100 p-2 rounded-xl text-xl">⏳</span> Atur Tanggal Kadaluarsa
                 </h3>
-                <button onclick="closeExpiryModal()" class="text-slate-400 hover:text-red-500 bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center transition-colors active:scale-95 text-xl font-bold">✕</button>
+                <button onclick="closeExpiryModal()" aria-label="Tutup modal kadaluarsa" class="text-slate-400 hover:text-red-500 bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center transition-colors active:scale-95 text-xl font-bold">✕</button>
             </div>
             
             <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6">
-                <input type="text" id="expirySearch" onkeyup="filterExpiryList()" placeholder="Cari nama barang atau barcode..." class="w-full p-3 border-2 border-slate-200 rounded-xl text-sm bg-white font-medium focus:border-orange-500 outline-none">
+                <input type="text" id="expirySearch" onkeyup="filterExpiryList()" placeholder="Cari nama barang atau barcode..." class="w-full p-3.5 border-2 border-slate-200 rounded-xl text-sm bg-white font-medium focus:border-orange-500 outline-none">
             </div>
             
             <div class="flex-1 overflow-auto bg-white border border-slate-200 rounded-2xl shadow-sm">
@@ -465,60 +639,83 @@
     </div>
 
     <!-- Modal Resi / Sukses -->
-    <div id="receiptModal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl transform transition-transform scale-100 text-center">
+    <div id="receiptModal" role="dialog" aria-modal="true" aria-labelledby="receiptTitle" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-sm md:max-w-md shadow-2xl transform transition-transform scale-100 text-center border border-slate-100">
             <div class="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-emerald-100 mb-6 border-4 border-white shadow-lg">
-                <span class="text-4xl">✓</span>
+                <span class="text-4xl text-emerald-600">✓</span>
             </div>
-            <h3 class="text-2xl font-extrabold text-slate-800 mb-6">Pembayaran Sukses</h3>
+            <h3 id="receiptTitle" class="text-2xl font-extrabold text-slate-800 mb-6">Pembayaran Sukses</h3>
             
             <div id="receiptContent" class="bg-slate-50 p-5 rounded-2xl text-sm mb-6 font-mono border border-slate-100 text-left overflow-y-auto max-h-60 shadow-inner">
                 <!-- Struk dirender di sini -->
             </div>
             
             <div class="flex gap-3">
-                <button onclick="closeReceiptModal()" class="flex-1 py-4 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 font-bold transition-colors active:scale-95">Tutup</button>
-                <button onclick="sendToWhatsApp()" class="flex-1 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-bold shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 transition-all active:scale-95"><span>💬</span> Kirim WA</button>
+                <button onclick="closeReceiptModal()" class="flex-1 py-4 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 font-bold transition-colors active:scale-95 min-h-[48px]">Tutup</button>
+                <button onclick="sendToWhatsApp()" class="flex-1 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-bold shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 transition-all active:scale-95 min-h-[48px]"><span>💬</span> Kirim WA</button>
             </div>
         </div>
     </div>
     
     <!-- Toast Notifikasi -->
-    <div id="toast" class="hidden fixed top-6 right-6 lg:left-1/2 lg:-translate-x-1/2 lg:right-auto px-6 py-4 rounded-2xl shadow-2xl z-[100] flex items-center gap-3 font-bold text-sm transform transition-all translate-y-0 opacity-100">
+    <div id="toast" role="status" aria-live="polite" class="hidden fixed top-6 right-6 lg:left-1/2 lg:-translate-x-1/2 lg:right-auto px-6 py-4 rounded-2xl shadow-2xl z-[100] flex items-center gap-3 font-bold text-sm transform transition-all translate-y-0 opacity-100">
         <span id="toastIcon" class="text-xl">✅</span>
         <span id="toastMsg">Notifikasi</span>
     </div>
 
     <!-- Dialog Konfirmasi Kustom -->
-    <div id="customConfirm" class="hidden fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl text-center">
-            <div class="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">❓</div>
+    <div id="customConfirm" role="dialog" aria-modal="true" aria-labelledby="confirmMsg" class="hidden fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-sm shadow-2xl text-center border border-slate-100">
+            <div class="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">❓</div>
             <h3 id="confirmMsg" class="font-bold text-lg mb-8 text-slate-800">Konfirmasi</h3>
             <div class="flex gap-3">
-                <button id="btnConfirmCancel" class="flex-1 py-3 bg-slate-100 rounded-xl text-slate-600 font-bold hover:bg-slate-200 transition-colors active:scale-95">Batal</button>
-                <button id="btnConfirmOk" class="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-md transition-colors active:scale-95">Ya, Lanjutkan</button>
+                <button id="btnConfirmCancel" class="flex-1 py-3.5 bg-slate-100 rounded-xl text-slate-600 font-bold hover:bg-slate-200 transition-colors active:scale-95 min-h-[48px]">Batal</button>
+                <button id="btnConfirmOk" class="flex-1 py-3.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-md transition-colors active:scale-95 min-h-[48px]">Ya, Lanjutkan</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal Laporan -->
-    <div id="exportModal" class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-4xl shadow-2xl flex flex-col h-[85vh] border border-slate-100">
+    <!-- Modal Laporan & Hourly Sales Tracker -->
+    <div id="exportModal" role="dialog" aria-modal="true" aria-labelledby="exportTitle" class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-5xl shadow-2xl flex flex-col h-[88vh] border border-slate-100">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="font-extrabold text-xl text-slate-800 flex items-center gap-3">
-                    <span class="bg-blue-100 p-2 rounded-lg text-xl">📊</span> Laporan Penjualan
+                <h3 id="exportTitle" class="font-extrabold text-xl text-slate-800 flex items-center gap-3">
+                    <span class="bg-blue-100 p-2 rounded-xl text-xl">📊</span> Laporan & Analytics Penjualan
                 </h3>
-                <button onclick="closeExportModal()" class="text-slate-400 hover:text-red-500 bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center transition-colors active:scale-95 text-xl font-bold">✕</button>
+                <button onclick="closeExportModal()" aria-label="Tutup modal laporan" class="text-slate-400 hover:text-red-500 bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center transition-colors active:scale-95 text-xl font-bold">✕</button>
             </div>
             
             <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6 flex flex-col md:flex-row gap-3">
                 <div class="flex-1 flex gap-3">
-                    <input type="date" id="exportStart" class="p-3 border-2 border-slate-200 rounded-xl text-sm w-full bg-white font-medium focus:border-blue-500 outline-none">
-                    <input type="date" id="exportEnd" class="p-3 border-2 border-slate-200 rounded-xl text-sm w-full bg-white font-medium focus:border-blue-500 outline-none">
+                    <input type="date" id="exportStart" aria-label="Tanggal Mulai Laporan" class="p-3.5 border-2 border-slate-200 rounded-xl text-sm w-full bg-white font-medium focus:border-blue-500 outline-none">
+                    <input type="date" id="exportEnd" aria-label="Tanggal Akhir Laporan" class="p-3.5 border-2 border-slate-200 rounded-xl text-sm w-full bg-white font-medium focus:border-blue-500 outline-none">
                 </div>
-                <button onclick="fetchReportData()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 active:scale-95 transition-all whitespace-nowrap">Tarik Data</button>
+                <button onclick="fetchReportData()" class="bg-blue-600 text-white px-6 py-3.5 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 active:scale-95 transition-all whitespace-nowrap min-h-[48px]">Tarik Data</button>
             </div>
             
+            <!-- Hourly Sales Tracker & Peak Hour Analytics Section -->
+            <div id="hourlyTrackerSection" class="hidden mb-6 bg-gradient-to-r from-blue-900 to-slate-900 text-white p-5 rounded-2xl shadow-md">
+                <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4 border-b border-slate-700 pb-3">
+                    <div>
+                        <h4 class="font-extrabold text-base flex items-center gap-2"><span>⏰</span> Hourly Sales Tracker (Grafik 24 Jam)</h4>
+                        <p class="text-xs text-slate-300">Distribusi omset dan transaksi per jam</p>
+                    </div>
+                    <div id="peakHourBadge" class="bg-amber-500/20 border border-amber-400 text-amber-300 px-3.5 py-1.5 rounded-xl text-xs font-bold self-start md:self-auto">
+                        Peak Hour: -
+                    </div>
+                </div>
+                
+                <!-- 24-Hour Bar Chart Container -->
+                <div id="hourlyChartContainer" class="flex items-end gap-1.5 h-32 pt-4 px-2 overflow-x-auto">
+                    <!-- Dynamic Bars rendered here -->
+                </div>
+                
+                <div class="mt-3 pt-3 border-t border-slate-800 flex justify-between items-center text-xs text-slate-300 font-medium">
+                    <span id="staffingRecommendationText">💡 Rekomendasi Staf: Mengumpulkan data...</span>
+                    <span class="text-[11px] text-slate-400 font-mono">24H Breakdown</span>
+                </div>
+            </div>
+
             <div class="flex-1 overflow-auto bg-white border border-slate-200 rounded-2xl mb-6 shadow-sm">
                 <table class="w-full text-sm text-left">
                     <thead class="bg-slate-100 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-10 shadow-sm">
@@ -536,16 +733,16 @@
             </div>
             
             <div class="flex flex-col sm:flex-row gap-3 justify-end shrink-0">
-                <button onclick="copyReportData()" class="bg-slate-100 text-slate-700 px-6 py-4 rounded-xl font-bold hover:bg-slate-200 transition-colors active:scale-95 w-full sm:w-auto">Salin Teks</button>
-                <button onclick="downloadExcelReport()" id="btnDownloadExcel" class="bg-emerald-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all active:scale-95 hidden w-full sm:w-auto">Unduh Excel</button>
+                <button onclick="copyReportData()" class="bg-slate-100 text-slate-700 px-6 py-4 rounded-xl font-bold hover:bg-slate-200 transition-colors active:scale-95 w-full sm:w-auto min-h-[48px]">Salin Teks</button>
+                <button onclick="downloadExcelReport()" id="btnDownloadExcel" class="bg-emerald-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all active:scale-95 hidden w-full sm:w-auto min-h-[48px]">Unduh Excel</button>
             </div>
         </div>
     </div>
     
+    <!-- Script Logika Bisnis, Audit Log, Real-Time Sync & Analytics -->
     <script>
         const POS_API_URL = 'https://script.google.com/macros/s/AKfycbwkZVsoGXdgxck4xwOXk2fW4Oawn6diXu2bUX0sAIRFCfGeS1jTr6QjEH6Fr6-RFbnDAw/exec';
         const EVOUCHER_API_URL = "https://script.google.com/macros/s/AKfycbyQFkZW0QuBXi082jgXTsVBIy1OfVfhaQYVogvr7uBJBrCuGtkM73tTGqA1dl9ThlfL/exec";
-        
         const NEW_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwoW8zffXN_A1Z3y5SiVknDSO62s5ZBnYu7WQpu00ak-kDeH5PPsZZAg_-vXHGlknjR/exec";
 
         let currentArea = '', availableProducts = [], cart = [], selectedPaymentMethod = '', lastTransaction = null;
@@ -553,8 +750,12 @@
         let receivingCart = [], activePO = null; 
         let isOffline = false;
         
+        let splitPaymentData = null;
+        let unsubscribeProductListener = null;
+
         window.cachedPOs = {}; 
         window.allProducts = [];
+        window.auditLogs = JSON.parse(localStorage.getItem('adamart_audit_logs') || '[]');
 
         const areaPasswords = {
             'adamart 73': '1234',
@@ -566,24 +767,200 @@
         window.addEventListener('online',  updateOnlineStatus);
         window.addEventListener('offline', updateOnlineStatus);
 
+        // --- FEATURE 1: AUDIT TRAIL LOGGING ENGINE 🎬 ---
+        function logAudit(action, details, metadata = {}) {
+            const entry = {
+                id: 'LOG-' + Date.now() + '-' + Math.floor(Math.random()*1000),
+                timestamp: new Date().toISOString(),
+                timeStr: new Date().toLocaleTimeString('id-ID'),
+                dateStr: new Date().toLocaleDateString('id-ID'),
+                action,
+                details,
+                area: currentArea || 'Global',
+                cashier: activeShift ? activeShift.cashierName : 'System',
+                ...metadata
+            };
+
+            window.auditLogs.unshift(entry);
+            if (window.auditLogs.length > 500) window.auditLogs.pop();
+            
+            try {
+                localStorage.setItem('adamart_audit_logs', JSON.stringify(window.auditLogs));
+            } catch(e){}
+
+            if (navigator.onLine && window.db) {
+                window.addDoc(window.collection(window.db, "audit_logs"), entry).catch(() => {});
+            }
+        }
+
+        function openAuditModal() {
+            document.getElementById('auditTrailModal').classList.remove('hidden');
+            renderAuditLogs();
+            logAudit("AUDIT_MODAL_OPENED", "Kasir membuka modal audit trail");
+        }
+
+        function closeAuditModal() {
+            document.getElementById('auditTrailModal').classList.add('hidden');
+        }
+
+        function renderAuditLogs(logs = window.auditLogs) {
+            const container = document.getElementById('auditLogsList');
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="text-center py-12 text-slate-400 font-medium">Belum ada riwayat aktivitas yang tercatat.</div>';
+                return;
+            }
+
+            container.innerHTML = logs.map(l => {
+                let badgeClass = 'bg-slate-100 text-slate-700';
+                if (l.action.includes('CART')) badgeClass = 'bg-blue-100 text-blue-800';
+                else if (l.action.includes('PAYMENT') || l.action.includes('TRANSACTION')) badgeClass = 'bg-emerald-100 text-emerald-800';
+                else if (l.action.includes('SHIFT') || l.action.includes('AREA')) badgeClass = 'bg-purple-100 text-purple-800';
+                else if (l.action.includes('SYNC') || l.action.includes('CONFLICT')) badgeClass = 'bg-red-100 text-red-800';
+
+                return `
+                <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row justify-between sm:items-center gap-2 hover:bg-white transition-colors">
+                    <div class="flex items-start gap-3">
+                        <span class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wide shrink-0 ${badgeClass}">${l.action}</span>
+                        <div>
+                            <p class="font-bold text-slate-800 text-sm leading-snug">${l.details}</p>
+                            <p class="text-xs text-slate-400 mt-0.5">Area: <span class="font-semibold text-slate-600">${l.area}</span> • Kasir: <span class="font-semibold text-slate-600">${l.cashier}</span></p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-mono text-slate-400 whitespace-nowrap self-end sm:self-center">${l.dateStr} ${l.timeStr}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function filterAuditLogs() {
+            const query = document.getElementById('auditSearchInput').value.toLowerCase();
+            const filterType = document.getElementById('auditFilterType').value;
+
+            const filtered = window.auditLogs.filter(l => {
+                const matchesQuery = l.details.toLowerCase().includes(query) || l.cashier.toLowerCase().includes(query) || l.action.toLowerCase().includes(query);
+                let matchesType = true;
+
+                if (filterType === 'CART') matchesType = l.action.includes('CART');
+                else if (filterType === 'PAYMENT') matchesType = l.action.includes('PAYMENT') || l.action.includes('TRANSACTION');
+                else if (filterType === 'SHIFT') matchesType = l.action.includes('SHIFT') || l.action.includes('AREA');
+                else if (filterType === 'SYNC') matchesType = l.action.includes('SYNC') || l.action.includes('CONFLICT');
+
+                return matchesQuery && matchesType;
+            });
+
+            renderAuditLogs(filtered);
+        }
+
+        function exportAuditLogs() {
+            if (window.auditLogs.length === 0) return showToast("Tidak ada log untuk diunduh", true);
+            const ws = XLSX.utils.json_to_sheet(window.auditLogs);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Audit Trail");
+            XLSX.writeFile(wb, `Audit_Trail_Adamart_${new Date().toISOString().split('T')[0]}.xlsx`);
+            logAudit("AUDIT_LOGS_EXPORTED", "Kasir mengunduh log audit trail Excel");
+            showToast("Log Audit berhasil diunduh");
+        }
+
+        // --- FEATURE 4: SPLIT PAYMENT CALCULATOR 💳 ---
+        function openSplitPaymentModal() {
+            const tot = calculateCartFinalTotal();
+            if (tot <= 0) return showToast("Keranjang belanja masih kosong", true);
+
+            document.getElementById('splitTotalDisplay').textContent = formatRp(tot);
+            document.getElementById('splitAmount1').value = Math.round(tot / 2);
+            document.getElementById('splitAmount2').value = Math.round(tot / 2);
+            document.getElementById('splitPaymentModal').classList.remove('hidden');
+            calculateSplit();
+        }
+
+        function closeSplitPaymentModal() {
+            document.getElementById('splitPaymentModal').classList.add('hidden');
+        }
+
+        function calculateSplit() {
+            const tot = calculateCartFinalTotal();
+            const amt1 = parseInt(document.getElementById('splitAmount1').value) || 0;
+            const amt2 = parseInt(document.getElementById('splitAmount2').value) || 0;
+            const m1 = document.getElementById('splitMethod1').value;
+            const m2 = document.getElementById('splitMethod2').value;
+
+            const totalPaid = amt1 + amt2;
+            const remaining = Math.max(0, tot - totalPaid);
+            const change = (m1 === 'Tunai' || m2 === 'Tunai') ? Math.max(0, totalPaid - tot) : 0;
+
+            document.getElementById('splitTotalPaid').textContent = formatRp(totalPaid);
+            document.getElementById('splitRemaining').textContent = formatRp(remaining);
+
+            const btn = document.getElementById('btnConfirmSplit');
+            const changeRow = document.getElementById('splitChangeRow');
+
+            if (change > 0) {
+                changeRow.classList.remove('hidden');
+                document.getElementById('splitChange').textContent = formatRp(change);
+            } else {
+                changeRow.classList.add('hidden');
+            }
+
+            if (totalPaid >= tot && amt1 > 0 && amt2 > 0) {
+                btn.disabled = false;
+                btn.textContent = `Konfirmasi Split Payment (${formatRp(totalPaid)})`;
+            } else {
+                btn.disabled = true;
+                btn.textContent = "Nominal Kurang";
+            }
+        }
+
+        function confirmSplitPayment() {
+            const amt1 = parseInt(document.getElementById('splitAmount1').value) || 0;
+            const amt2 = parseInt(document.getElementById('splitAmount2').value) || 0;
+            const m1 = document.getElementById('splitMethod1').value;
+            const m2 = document.getElementById('splitMethod2').value;
+            const tot = calculateCartFinalTotal();
+            const change = (m1 === 'Tunai' || m2 === 'Tunai') ? Math.max(0, (amt1 + amt2) - tot) : 0;
+
+            splitPaymentData = {
+                method1: m1, amount1: amt1,
+                method2: m2, amount2: amt2,
+                change: change,
+                summaryStr: `Split (${m1}: ${formatRp(amt1)}, ${m2}: ${formatRp(amt2)})`
+            };
+
+            selectedPaymentMethod = 'Split Payment';
+            closeSplitPaymentModal();
+
+            document.querySelectorAll('.payment-btn').forEach(b => {
+                b.className = 'payment-btn bg-white border-2 border-slate-200 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95 min-h-[44px]';
+            });
+            document.getElementById('paySplit').className = 'payment-btn bg-indigo-50 border-2 border-indigo-500 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-indigo-700 shadow-sm active:scale-95 transition-all min-h-[44px]';
+
+            logAudit("SPLIT_PAYMENT_CONFIGURED", `Mengatur split payment: ${splitPaymentData.summaryStr}`);
+            updateCartDisplay();
+            showToast("Split payment terpasang");
+        }
+
+        function calculateCartFinalTotal() {
+            return cart.reduce((a, b) => a + (b.price * b.quantity), 0);
+        }
+
         function updateOnlineStatus() {
             isOffline = !navigator.onLine;
             const statusEl = document.getElementById('connectionStatus');
-            const header = document.getElementById('mainHeader');
             
             if(isOffline) {
                 statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span> OFFLINE';
-                statusEl.className = 'bg-red-50 text-red-700 text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-red-200';
+                statusEl.className = 'bg-red-50 text-red-700 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-red-200';
                 showToast("Mode Offline Aktif. Data aman di perangkat.", true);
+                logAudit("NETWORK_OFFLINE", "Koneksi terputus. Beralih ke mode offline.");
             } else {
                 statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> ONLINE';
-                statusEl.className = 'bg-emerald-100 text-emerald-700 text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-emerald-200';
+                statusEl.className = 'bg-emerald-100 text-emerald-700 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-emerald-200';
                 showToast("Kembali Online. Sinkronisasi...");
+                logAudit("NETWORK_ONLINE", "Koneksi terhubung kembali. Memulai sinkronisasi.");
                 syncOfflineData();
             }
         }
 
         function formatRp(n) { return "Rp " + (n || 0).toLocaleString('id-ID'); }
+        
         function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
             document.getElementById('toastMsg').textContent = msg;
@@ -634,9 +1011,11 @@
             const input = document.getElementById('areaPassword').value;
             if (input === areaPasswords[pendingArea]) {
                 document.getElementById('passwordModal').classList.add('hidden');
+                logAudit("AREA_ENTER", `Berhasil verifikasi PIN area ${pendingArea}`);
                 selectArea(pendingArea);
             } else {
                 showToast("PIN yang dimasukkan salah", true);
+                logAudit("PIN_VERIFY_FAILED", `Gagal memasukkan PIN untuk area ${pendingArea}`);
             }
         }
 
@@ -660,6 +1039,7 @@
             localStorage.setItem('adamart_shift', JSON.stringify(data));
             activeShift = data;
             initShift(); showToast(`Toko siap. Kasir: ${name}`);
+            logAudit("SHIFT_START", `Buka shift kasir: ${name} dengan modal awal ${formatRp(cash)}`);
         }
         
         async function closeShiftModal() {
@@ -716,16 +1096,19 @@
                 showToast("Shift ditutup. Data tersimpan di perangkat.", true);
             }
             
+            logAudit("SHIFT_CLOSE", `Tutup shift kasir: ${activeShift.cashierName}, Selisih Uang Fisik: ${formatRp(rep.difference)}`);
             localStorage.removeItem('adamart_shift'); activeShift = null;
             setTimeout(() => { location.reload(); }, 1500);
         }
 
         function selectPaymentMethod(m) {
             selectedPaymentMethod = m;
+            splitPaymentData = null;
             document.querySelectorAll('.payment-btn').forEach(b => {
-                b.className = 'payment-btn bg-white border-2 border-slate-200 py-3 rounded-xl text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95';
+                b.className = 'payment-btn bg-white border-2 border-slate-200 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95 min-h-[44px]';
             });
-            document.getElementById('pay'+m).className = 'payment-btn bg-blue-50 border-2 border-blue-500 py-3 rounded-xl text-sm font-bold text-blue-700 shadow-sm active:scale-95 transition-all';
+            document.getElementById('pay'+m).className = 'payment-btn bg-blue-50 border-2 border-blue-500 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-blue-700 shadow-sm active:scale-95 transition-all min-h-[44px]';
+            logAudit("PAYMENT_METHOD_SELECT", `Memilih metode pembayaran: ${m}`);
             updateCartDisplay();
         }
 
@@ -748,7 +1131,7 @@
                     document.getElementById('evUserLimit').textContent = formatRp(rem);
                     document.getElementById('evFoundUser').value = JSON.stringify(u);
                     const btn = document.getElementById('evSubmitBtn');
-                    const tot = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
+                    const tot = calculateCartFinalTotal();
                     btn.disabled = rem < tot;
                     if(rem < tot) { btn.textContent = "Limit Tidak Cukup"; btn.classList.add('bg-slate-300', 'text-slate-500'); btn.classList.remove('bg-emerald-600', 'text-white', 'hover:bg-emerald-700'); }
                     else { btn.textContent = "Konfirmasi Pembayaran"; btn.classList.remove('bg-slate-300', 'text-slate-500'); btn.classList.add('bg-emerald-600', 'text-white', 'hover:bg-emerald-700'); }
@@ -766,7 +1149,7 @@
 
         function processKasbonTransaction() {
             const u = JSON.parse(document.getElementById('evFoundUser').value);
-            const tot = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
+            const tot = calculateCartFinalTotal();
             const pl = {
                 idUser: u.noAnggota!=='-'?u.noAnggota:u.nik, nama: u.name, merchant: "Adamart POS", nominal: tot,
                 keterangan: "Belanja "+currentArea, kodeVoucher: "KA"+Date.now(), periode: `${new Date().getMonth()+1}-${new Date().getFullYear()}`,
@@ -783,11 +1166,18 @@
         async function executeTransaction(ex={}) {
             if(!activeShift) return showToast("Buka Shift terlebih dahulu", true);
             
-            const tot = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
+            const tot = calculateCartFinalTotal();
+            let methodString = selectedPaymentMethod;
+            if (selectedPaymentMethod === 'Split Payment' && splitPaymentData) {
+                methodString = splitPaymentData.summaryStr;
+            }
+
             const d = { 
                 area: currentArea, shiftId: activeShift.id, items: cart.map(i=>`${i.name} x${i.quantity}`).join(', '),
-                total: tot, method: selectedPaymentMethod, cart: cart, ...ex, timestamp: new Date().toISOString()
+                total: tot, method: methodString, splitDetails: splitPaymentData, cart: cart, ...ex, timestamp: new Date().toISOString()
             };
+
+            logAudit("TRANSACTION_COMPLETE", `Transaksi berhasil: ${formatRp(tot)} (${methodString})`, { itemCount: cart.length });
 
             if (!navigator.onLine) {
                 const pending = JSON.parse(localStorage.getItem('adamart_pending_tx') || '[]');
@@ -887,6 +1277,7 @@
             
             if(successCount > 0) {
                 showToast(`Sukses sinkronisasi ${successCount} transaksi`);
+                logAudit("OFFLINE_SYNC_COMPLETE", `Berhasil menyinkronkan ${successCount} transaksi tertunda`);
                 loadProducts(); 
             }
             if(newPending.length > 0) showToast(`Tersisa ${newPending.length} transaksi gagal kirim`, true);
@@ -915,6 +1306,7 @@
             document.getElementById('poPlaceholder').classList.remove('hidden');
             checkPendingPO(); 
             document.getElementById('receivingModal').classList.remove('hidden');
+            logAudit("RECEIVING_MODAL_OPENED", "Kasir membuka modal cek PO");
         }
 
         async function checkPendingPO() {
@@ -1074,6 +1466,7 @@
                     });
                     fetch(POS_API_URL, {method:'POST', body:JSON.stringify({action:'record_receiving', data:log})});
                     showToast("Stok berhasil diperbarui");
+                    logAudit("RECEIVING_COMPLETED", `Restock barang dari PO ${activePO.batchNumber} selesai`);
                     closeReceivingModal(); 
                     loadProducts(); 
                 }
@@ -1123,7 +1516,7 @@
                         <input type="date" id="exp_${p.id}" value="${exp}" class="w-full p-3 border-2 border-slate-200 rounded-xl text-sm focus:border-orange-500 outline-none text-slate-700 font-medium">
                     </td>
                     <td class="p-4 text-center">
-                        <button onclick="saveExpiry('${p.id}')" class="bg-orange-100 text-orange-700 px-4 py-3 w-full rounded-xl text-xs font-bold hover:bg-orange-200 transition-colors active:scale-95 shadow-sm">Simpan</button>
+                        <button onclick="saveExpiry('${p.id}')" class="bg-orange-100 text-orange-700 px-4 py-3 w-full rounded-xl text-xs font-bold hover:bg-orange-200 transition-colors active:scale-95 shadow-sm min-h-[40px]">Simpan</button>
                     </td>
                 </tr>`;
             }).join('');
@@ -1147,21 +1540,22 @@
                 localStorage.setItem(`adamart_products_${currentArea}`, JSON.stringify(window.allProducts));
                 
                 showToast("Tanggal kadaluarsa tersimpan");
+                logAudit("EXPIRY_DATE_UPDATED", `Memperbarui tanggal kadaluarsa barang ID ${docId}`);
             } catch(e) {
                 showToast("Gagal menyimpan data", true);
             }
         }
 
         function clearCart() { 
-            if(cart.length) { showConfirm("Kosongkan semua barang di keranjang?", () => { cart=[]; updateCartDisplay(); }); } 
+            if(cart.length) { showConfirm("Kosongkan semua barang di keranjang?", () => { cart=[]; splitPaymentData=null; updateCartDisplay(); logAudit("CART_CLEARED", "Kasir mengosongkan keranjang"); }); } 
         }
         function changeArea() { showConfirm("Keluar dari area ini?", () => { location.reload(); }); }
         function resetTransaction() { 
-            cart=[]; selectedPaymentMethod=''; 
+            cart=[]; selectedPaymentMethod=''; splitPaymentData=null;
             document.getElementById('checkoutBtn').disabled=true; 
             document.getElementById('checkoutBtn').textContent="PILIH METODE BAYAR"; 
             updateCartDisplay(); 
-            document.querySelectorAll('.payment-btn').forEach(b=>b.className='payment-btn bg-white border-2 border-slate-200 py-3 rounded-xl text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95'); 
+            document.querySelectorAll('.payment-btn').forEach(b=>b.className='payment-btn bg-white border-2 border-slate-200 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 transition-all hover:border-blue-300 active:scale-95 min-h-[44px]'); 
         }
         function closeReceivingModal() { document.getElementById('receivingModal').classList.add('hidden'); }
         function closeReceiptModal() { document.getElementById('receiptModal').classList.add('hidden'); }
@@ -1171,6 +1565,7 @@
             localStorage.removeItem(`adamart_products_${currentArea}`);
             loadProducts();
             showToast("Memuat ulang data terbaru...");
+            logAudit("FORCE_REFRESH", "Kasir memuat ulang data produk");
         }
 
         async function selectArea(area) {
@@ -1183,12 +1578,49 @@
                 if(window.db){
                     clearInterval(c);
                     await loadProducts();
+                    setupRealTimeSync();
                     document.getElementById('loadingScreen').classList.add('hidden');
                     document.getElementById('cashierInterface').classList.remove('hidden');
                     document.getElementById('currentArea').textContent=area;
                     initShift();
                 }
             }, 100);
+        }
+
+        // --- FEATURE 2: MULTI-DEVICE REAL-TIME SYNC 📡 ---
+        function setupRealTimeSync() {
+            if (!navigator.onLine || !window.db) return;
+            if (unsubscribeProductListener) unsubscribeProductListener();
+
+            try {
+                const q = window.query(window.collection(window.db, "products"));
+                const stockKey = `Stok Area Kasir ${currentArea}`;
+
+                unsubscribeProductListener = window.onSnapshot(q, (snapshot) => {
+                    const products = [];
+                    snapshot.forEach((doc) => { products.push({ id: doc.id, ...doc.data() }); });
+                    window.allProducts = products;
+                    availableProducts = products.filter(p => (p[stockKey] || 0) > 0);
+
+                    // Conflict prevention: check items in current cart
+                    cart.forEach(item => {
+                        const updatedProd = availableProducts.find(p => String(p.Barcode) === String(item.barcode));
+                        const liveStock = updatedProd ? (updatedProd[stockKey] || 0) : 0;
+                        if (item.quantity > liveStock) {
+                            item.quantity = Math.max(0, liveStock);
+                            showToast(`⚠️ Stok ${item.name} diperbarui dari tablet lain!`, true);
+                            logAudit("REALTIME_STOCK_CONFLICT", `Stok ${item.name} berkurang menjadi ${liveStock} di perangkat lain`);
+                        }
+                    });
+                    cart = cart.filter(i => i.quantity > 0);
+
+                    populateSelects();
+                    displayProducts();
+                    updateCartDisplay();
+                }, (error) => {
+                    console.error("Realtime sync error:", error);
+                });
+            } catch(e) {}
         }
 
         async function loadProducts() {
@@ -1247,17 +1679,18 @@
                 const stockColorClass = stock > 5 ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-red-600 bg-red-50 border-red-100';
                 
                 return `
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-400 transition-all cursor-pointer flex flex-col h-full active:scale-95 select-none group" onclick="addToCart('${String(p.Barcode).replace(/'/g, "\\'")}')">
-                    <div class="flex-1">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-400 transition-all cursor-pointer flex flex-col justify-between active:scale-95 select-none group min-h-[160px]" onclick="addToCart('${String(p.Barcode).replace(/'/g, "\\'")}')">
+                    <div>
                         <h4 class="font-bold text-slate-800 text-sm leading-snug mb-2 line-clamp-2 group-hover:text-blue-700 transition-colors">${p['Nama Produk']}</h4>
-                        <div class="inline-block bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs font-mono mb-3 border border-slate-200">${p.Barcode}</div>
-                        
-                        <div class="inline-block px-2 py-1 rounded-md text-xs font-bold border ${stockColorClass}">
-                            Sisa: ${stock}
+                        <div class="inline-block bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs font-mono mb-2.5 border border-slate-200">${p.Barcode}</div>
+                        <div>
+                            <span class="inline-block px-2 py-0.5 rounded-md text-[11px] font-bold border ${stockColorClass}">
+                                Stok: ${stock}
+                            </span>
                         </div>
                     </div>
                     <div class="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center">
-                        <span class="text-blue-700 font-extrabold text-base tracking-tight">${formatRp(p.Harga)}</span>
+                        <span class="text-blue-700 font-extrabold text-sm sm:text-base tracking-tight">${formatRp(p.Harga)}</span>
                         <div class="bg-blue-50 text-blue-600 w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-lg group-hover:bg-blue-600 group-hover:text-white transition-colors shadow-sm">+</div>
                     </div>
                 </div>`
@@ -1294,6 +1727,7 @@
                 cart.push({ barcode: product.Barcode, name: product['Nama Produk'], price: product.Harga, quantity: 1, docId: product.id }); 
             }
             
+            logAudit("CART_ADD", `Tambah barang ke keranjang: ${product['Nama Produk']}`);
             updateCartDisplay(); 
             
             const mobileBtn = document.getElementById('mobileCartBtn');
@@ -1310,7 +1744,7 @@
             const evTotal = document.getElementById('evTotalAmountDisplay');
             if (!container) return;
             
-            let total = 0;
+            const finalTotal = calculateCartFinalTotal();
             
             if (cart.length === 0) { 
                 container.innerHTML = `
@@ -1320,24 +1754,23 @@
                 </div>`; 
             } else {
                 container.innerHTML = cart.map((item, idx) => {
-                    total += item.price * item.quantity;
                     return `
-                    <div class="flex justify-between items-center bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm transition-all hover:border-blue-200 group">
+                    <div class="flex justify-between items-center bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-blue-200 group">
                         <div class="flex-1 overflow-hidden pr-3">
                             <div class="font-bold text-slate-800 text-sm leading-snug line-clamp-2">${item.name}</div>
                             <div class="text-xs font-semibold text-blue-600 mt-1">${formatRp(item.price)}</div>
                         </div>
-                        <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-1">
-                            <button onclick="modQty(${idx}, -1)" class="w-8 h-8 text-slate-600 rounded-md flex items-center justify-center hover:bg-white hover:shadow-sm hover:text-red-500 font-extrabold transition-all active:scale-90">-</button>
+                        <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1 shrink-0">
+                            <button onclick="modQty(${idx}, -1)" aria-label="Kurangi jumlah item" class="w-8 h-8 text-slate-600 rounded-lg flex items-center justify-center hover:bg-white hover:shadow-sm hover:text-red-500 font-extrabold transition-all active:scale-90">-</button>
                             <span class="font-extrabold w-6 text-center text-slate-800 text-sm">${item.quantity}</span>
-                            <button onclick="modQty(${idx}, 1)" class="w-8 h-8 text-slate-600 rounded-md flex items-center justify-center hover:bg-white hover:shadow-sm hover:text-blue-600 font-extrabold transition-all active:scale-90">+</button>
+                            <button onclick="modQty(${idx}, 1)" aria-label="Tambah jumlah item" class="w-8 h-8 text-slate-600 rounded-lg flex items-center justify-center hover:bg-white hover:shadow-sm hover:text-blue-600 font-extrabold transition-all active:scale-90">+</button>
                         </div>
                     </div>`;
                 }).join('');
             }
-            
-            totalEl.textContent = formatRp(total);
-            if(evTotal) evTotal.textContent = formatRp(total);
+
+            totalEl.textContent = formatRp(finalTotal);
+            if(evTotal) evTotal.textContent = formatRp(finalTotal);
             
             if(checkoutBtn) {
                 checkoutBtn.disabled = cart.length === 0 || !selectedPaymentMethod;
@@ -1352,7 +1785,8 @@
                     checkoutBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'shadow-blue-200');
                 }
                 else {
-                    checkoutBtn.textContent = `BAYAR ${formatRp(total)}`;
+                    const label = selectedPaymentMethod === 'Split Payment' ? 'BAYAR SPLIT' : `BAYAR ${formatRp(finalTotal)}`;
+                    checkoutBtn.textContent = label;
                     checkoutBtn.classList.remove('bg-slate-300');
                     checkoutBtn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'shadow-blue-200');
                 }
@@ -1383,7 +1817,12 @@
             }
 
             cart[idx].quantity += change;
-            if(cart[idx].quantity <= 0) cart.splice(idx, 1);
+            if(cart[idx].quantity <= 0) {
+                logAudit("CART_REMOVE", `Menghapus ${cart[idx].name} dari keranjang`);
+                cart.splice(idx, 1);
+            } else {
+                logAudit("CART_QTY_MODIFIED", `Mengubah kuantitas ${cart[idx].name} menjadi ${cart[idx].quantity}`);
+            }
             updateCartDisplay();
         }
 
@@ -1401,7 +1840,7 @@
                     <span class="whitespace-nowrap">${formatRp(i.price * i.quantity)}</span>
                 </div>`; 
             });
-            
+
             h += `
             <div class="border-b-2 border-dashed border-slate-200 my-3"></div>
             <div class="flex justify-between font-extrabold text-lg mt-2 text-slate-800">
@@ -1431,18 +1870,19 @@
         }
 
         function openExportModal() {
-            document.getElementById('exportStart').value = new Date().toISOString().split('T')[0];
-            document.getElementById('exportEnd').value = new Date().toISOString().split('T')[0];
-            document.getElementById('reportTableBody').innerHTML = '<tr><td colspan="4" class="text-center p-12 text-slate-400 font-medium bg-slate-50">Pilih tanggal dan klik "Tarik Data" untuk melihat laporan</td></tr>';
-            document.getElementById('btnDownloadExcel').classList.add('hidden');
-            window.currentReportData = [];
+            if (!navigator.onLine) return showToast("Fitur laporan butuh internet", true);
             document.getElementById('exportModal').classList.remove('hidden');
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('exportStart').value = today;
+            document.getElementById('exportEnd').value = today;
+            logAudit("REPORT_MODAL_OPENED", "Kasir membuka modal laporan & analytics");
         }
 
         function closeExportModal() {
             document.getElementById('exportModal').classList.add('hidden');
         }
 
+        // --- FEATURE 3: HOURLY SALES TRACKER & STAFFING RECOMMENDATION ⏰ ---
         async function fetchReportData() {
             if (!navigator.onLine) return showToast("Harus online untuk rekap data", true);
             const start = document.getElementById('exportStart').value;
@@ -1454,6 +1894,8 @@
                 const q = window.query(window.collection(window.db, "sales"));
                 const snap = await window.getDocs(q);
                 const itemSummary = {};
+                const hourlySales = Array(24).fill(0);
+                const hourlyTxCount = Array(24).fill(0);
                 
                 snap.forEach(doc => {
                     const sale = doc.data();
@@ -1462,6 +1904,12 @@
                     const saleDate = sale.timestamp.split('T')[0];
                     
                     if (saleDate >= start && saleDate <= end) {
+                        // Hourly calculation
+                        const dateObj = new Date(sale.timestamp);
+                        const hour = dateObj.getHours();
+                        hourlySales[hour] += (sale.total || 0);
+                        hourlyTxCount[hour] += 1;
+
                         const cart = sale.cart || [];
                         cart.forEach(item => {
                             const key = item.name + "_" + sale.area;
@@ -1478,6 +1926,8 @@
                         });
                     }
                 });
+
+                renderHourlySalesChart(hourlySales, hourlyTxCount);
 
                 const data = Object.values(itemSummary);
                 data.sort((a, b) => b['Total Terjual (Qty)'] - a['Total Terjual (Qty)']);
@@ -1502,6 +1952,51 @@
             } catch (err) {
                 tbody.innerHTML = `<tr><td colspan="4" class="text-center p-12 text-red-500 font-bold bg-red-50">Gagal menarik data: ${err.message}</td></tr>`;
             }
+        }
+
+        function renderHourlySalesChart(hourlySales, hourlyTxCount) {
+            const section = document.getElementById('hourlyTrackerSection');
+            const container = document.getElementById('hourlyChartContainer');
+            section.classList.remove('hidden');
+
+            const maxSales = Math.max(...hourlySales, 1);
+            let peakHour = 0;
+            let maxTx = 0;
+
+            for (let h = 0; h < 24; h++) {
+                if (hourlySales[h] > hourlySales[peakHour]) {
+                    peakHour = h;
+                }
+                if (hourlyTxCount[h] > maxTx) maxTx = hourlyTxCount[h];
+            }
+
+            document.getElementById('peakHourBadge').textContent = `Peak Hour: ${String(peakHour).padStart(2, '0')}:00 - ${String(peakHour+1).padStart(2, '0')}:00 (${formatRp(hourlySales[peakHour])})`;
+
+            // Staffing recommendation
+            let staffRec = "1 Kasir Cukup";
+            if (maxTx > 15) staffRec = "Saran: 3 Kasir Standby";
+            else if (maxTx > 8) staffRec = "Saran: 2 Kasir Standby";
+
+            document.getElementById('staffingRecommendationText').textContent = `💡 Rekomendasi Staf Jam Puncak (${String(peakHour).padStart(2, '0')}:00): ${staffRec} (${hourlyTxCount[peakHour]} Transaksi)`;
+
+            container.innerHTML = hourlySales.map((val, h) => {
+                const heightPercent = Math.max(8, Math.round((val / maxSales) * 100));
+                const isPeak = h === peakHour && val > 0;
+                const barColor = isPeak ? 'bg-amber-400' : (val > 0 ? 'bg-blue-500' : 'bg-slate-800');
+
+                return `
+                <div class="flex-1 flex flex-col items-center group relative min-w-[20px]">
+                    <div class="w-full ${barColor} rounded-t transition-all hover:opacity-80" style="height: ${heightPercent}%;"></div>
+                    <span class="text-[9px] font-mono text-slate-400 mt-1">${String(h).padStart(2,'0')}</span>
+                    
+                    <!-- Tooltip -->
+                    <div class="hidden group-hover:block absolute bottom-full mb-2 bg-slate-900 text-white text-[10px] p-2 rounded-lg shadow-xl z-20 whitespace-nowrap border border-slate-700">
+                        <p class="font-bold">${String(h).padStart(2,'0')}:00 - ${String(h+1).padStart(2,'0')}:00</p>
+                        <p class="text-blue-300 font-extrabold">${formatRp(val)}</p>
+                        <p class="text-slate-400">${hourlyTxCount[h]} transaksi</p>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         function downloadExcelReport() {
@@ -1542,6 +2037,7 @@
             document.getElementById('productSelect').addEventListener('change', selectProduct);
             loadEvoucherData();
             updateOfflineBadge();
+            logAudit("POS_INITIALIZED", "Aplikasi POS dimuat di peramban");
         });
         
         window.promptPassword = promptPassword;
@@ -1579,6 +2075,15 @@
         window.closeExpiryModal = closeExpiryModal;
         window.saveExpiry = saveExpiry;
         window.filterExpiryList = filterExpiryList;
+        window.logAudit = logAudit;
+        window.openAuditModal = openAuditModal;
+        window.closeAuditModal = closeAuditModal;
+        window.filterAuditLogs = filterAuditLogs;
+        window.exportAuditLogs = exportAuditLogs;
+        window.openSplitPaymentModal = openSplitPaymentModal;
+        window.closeSplitPaymentModal = closeSplitPaymentModal;
+        window.calculateSplit = calculateSplit;
+        window.confirmSplitPayment = confirmSplitPayment;
     </script>
 </body>
 </html>
