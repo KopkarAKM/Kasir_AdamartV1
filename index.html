@@ -248,6 +248,7 @@
                 <button onclick="openExportModal()" aria-label="Buka Laporan" class="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all min-h-[40px]"><span>📊</span> Laporan</button>
                 <button onclick="showReceivingModal()" aria-label="Cek Surat Jalan PO" class="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all min-h-[40px]"><span>📦</span> Cek PO</button>
                 <button onclick="openExpiryModal()" aria-label="Atur Tanggal Kadaluarsa" class="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all min-h-[40px]"><span>⏳</span> Kadaluarsa</button>
+                <button onclick="openDamageModal()" aria-label="Lapor Barang Rusak" class="bg-white border border-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all min-h-[40px]"><span>🗑️</span> Barang Rusak</button>
                 <button onclick="closeShiftModal()" aria-label="Tutup Shift Kasir" class="bg-red-50 text-red-700 border border-red-200 px-3.5 py-2.5 rounded-xl text-xs font-bold hover:bg-red-100 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-all min-h-[40px]">🛑 Tutup</button>
             </div>
         </header>
@@ -603,6 +604,42 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Lapor Barang Rusak -->
+    <div id="damageModal" role="dialog" aria-modal="true" aria-labelledby="damageTitle" class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity safe-pb">
+        <div class="bg-white rounded-3xl p-0 w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+            <div class="p-4 sm:p-5 border-b border-slate-100 bg-red-50 flex justify-between items-center shrink-0">
+                <div>
+                    <h3 id="damageTitle" class="font-extrabold text-xl text-red-900 flex items-center gap-3">
+                        <span class="text-2xl">🗑️</span> Lapor Barang Rusak/Hilang
+                    </h3>
+                    <p class="text-xs sm:text-sm text-red-700 font-medium hidden sm:block">Penyesuaian stok akan tercatat di sistem audit dan mengurangi stok secara langsung</p>
+                </div>
+                <button onclick="closeDamageModal()" aria-label="Tutup modal rusak" class="text-slate-400 hover:text-red-500 bg-white shadow-sm w-10 h-10 flex items-center justify-center rounded-full transition-colors active:scale-95 text-lg font-bold">✕</button>
+            </div>
+            
+            <div class="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row gap-3 shadow-sm z-10 shrink-0">
+                <input type="text" id="damageSearch" oninput="filterDamageList()" placeholder="Cari nama barang atau barcode..." class="flex-1 p-3 border-2 border-slate-200 rounded-xl text-sm font-medium focus:border-red-500 outline-none transition-all">
+            </div>
+
+            <div class="flex-1 overflow-auto bg-slate-50 relative">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-slate-100 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-10 shadow-sm">
+                        <tr>
+                            <th class="p-4 font-bold">Produk</th>
+                            <th class="p-4 font-bold text-center w-32">Stok Saat Ini</th>
+                            <th class="p-4 font-bold text-center w-32">Jumlah Rusak</th>
+                            <th class="p-4 font-bold text-center w-40">Alasan</th>
+                            <th class="p-4 font-bold text-center w-28">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="damageTableBody" class="divide-y divide-slate-100 bg-white">
+                        <!-- Items rendered via JS -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -2032,6 +2069,112 @@
             document.body.removeChild(textarea);
         }
 
+        function openDamageModal() {
+            if (!navigator.onLine) return showToast("Fitur Barang Rusak butuh internet", true);
+            document.getElementById('damageModal').classList.remove('hidden');
+            document.getElementById('damageSearch').value = '';
+            renderDamageList();
+        }
+
+        function closeDamageModal() {
+            document.getElementById('damageModal').classList.add('hidden');
+            loadProducts();
+        }
+
+        function renderDamageList(term = '') {
+            const tbody = document.getElementById('damageTableBody');
+            const termLower = term.toLowerCase();
+            
+            const filtered = availableProducts.filter(p => 
+                String(p['Nama Produk']).toLowerCase().includes(termLower) || 
+                String(p.Barcode).toLowerCase().includes(termLower)
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center p-12 text-slate-400 font-medium bg-slate-50">Barang tidak ditemukan</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(p => {
+                const stock = p[`Stok Area Kasir ${currentArea}`] || 0;
+                return `
+                <tr class="hover:bg-red-50/30 transition-colors bg-white border-b border-slate-100">
+                    <td class="p-4 font-bold text-slate-700">${p['Nama Produk']}<br><span class="text-xs text-slate-400 font-mono bg-slate-100 px-1 py-0.5 rounded">${p.Barcode}</span></td>
+                    <td class="p-4 text-center font-extrabold text-slate-800">${stock}</td>
+                    <td class="p-4 text-center">
+                        <input type="number" id="dmgQty_${p.id}" min="1" max="${stock}" value="1" class="w-20 p-2 border-2 border-slate-200 rounded-xl text-sm font-bold focus:border-red-500 outline-none text-center bg-slate-50">
+                    </td>
+                    <td class="p-4 text-center">
+                        <select id="dmgReason_${p.id}" class="w-full p-2 border-2 border-slate-200 rounded-xl text-xs font-bold focus:border-red-500 outline-none cursor-pointer bg-slate-50">
+                            <option value="Rusak / Pecah">Rusak / Pecah</option>
+                            <option value="Dimakan Tikus">Dimakan Tikus</option>
+                            <option value="Kadaluarsa">Kadaluarsa</option>
+                            <option value="Hilang">Hilang</option>
+                        </select>
+                    </td>
+                    <td class="p-4 text-center">
+                        <button onclick="submitDamageReport('${p.id}')" class="bg-red-100 text-red-700 px-4 py-3 w-full rounded-xl text-xs font-bold hover:bg-red-200 transition-colors active:scale-95 shadow-sm min-h-[40px]">Lapor</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function filterDamageList() {
+            renderDamageList(document.getElementById('damageSearch').value);
+        }
+
+        async function submitDamageReport(docId) {
+            const product = window.allProducts.find(p => p.id === docId);
+            if (!product) return;
+            
+            const qtyInput = document.getElementById(`dmgQty_${docId}`);
+            const reasonInput = document.getElementById(`dmgReason_${docId}`);
+            
+            const qty = parseInt(qtyInput.value) || 0;
+            const reason = reasonInput.value;
+            const currentStock = product[`Stok Area Kasir ${currentArea}`] || 0;
+
+            if (qty <= 0) return showToast("Jumlah tidak valid", true);
+            if (qty > currentStock) return showToast("Jumlah melebihi stok yang ada", true);
+
+            showConfirm(`Lapor barang rusak: ${qty}x ${product['Nama Produk']} karena ${reason}?`, async () => {
+                try {
+                    const k = `Stok Area Kasir ${currentArea}`;
+                    await window.updateDoc(window.doc(window.db, "products", docId), {
+                        [k]: window.increment(-qty)
+                    });
+
+                    const log = {
+                        logId: "DMG-"+Date.now(),
+                        type: "DAMAGE",
+                        area: currentArea,
+                        items: [{
+                            name: product['Nama Produk'],
+                            barcode: product.Barcode,
+                            qtyDamaged: qty,
+                            reason: reason
+                        }],
+                        timestamp: new Date().toISOString(),
+                        user: activeShift ? activeShift.cashierName : "Admin"
+                    };
+
+                    await window.addDoc(window.collection(window.db,"inventory_logs"), log);
+                    
+                    showToast("Laporan Barang Rusak berhasil dicatat");
+                    logAudit("DAMAGE_REPORTED", `Lapor ${qty}x ${product['Nama Produk']} rusak (${reason})`);
+                    
+                    const pIndex = availableProducts.findIndex(p => p.id === docId);
+                    if (pIndex > -1) availableProducts[pIndex][k] -= qty;
+                    const aIndex = window.allProducts.findIndex(p => p.id === docId);
+                    if (aIndex > -1) window.allProducts[aIndex][k] -= qty;
+                    
+                    renderDamageList(document.getElementById('damageSearch').value);
+                } catch(e) {
+                    showToast("Gagal menyimpan laporan", true);
+                }
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', ()=> {
             document.getElementById('productSearch').addEventListener('input', filterProducts);
             document.getElementById('productSelect').addEventListener('change', selectProduct);
@@ -2075,6 +2218,10 @@
         window.closeExpiryModal = closeExpiryModal;
         window.saveExpiry = saveExpiry;
         window.filterExpiryList = filterExpiryList;
+        window.openDamageModal = openDamageModal;
+        window.closeDamageModal = closeDamageModal;
+        window.filterDamageList = filterDamageList;
+        window.submitDamageReport = submitDamageReport;
         window.logAudit = logAudit;
         window.openAuditModal = openAuditModal;
         window.closeAuditModal = closeAuditModal;
